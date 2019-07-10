@@ -63,33 +63,57 @@ table_2$ipc.s <- str_extract(table_2$ipc.code, "[^/]+")
 # TM --------------------------------------------------------------
 
 
-
+# Term Frequency ----------------------------------------------------------
 # Combine rows
 reviews$text.title.abstract <- 
   paste(reviews$Title, reviews$Abstract,
         sep =" ")
 
-#title.abstract <- paste(reviews$text.title.abstract,
-#                        collapse = "  ")
-
-# Set up source and corpus
-review_source <- VectorSource(reviews$text.title.abstract)
-corpus <- Corpus(review_source)
-
-# Clean corpus
-corpus.temp <- tm_map(corpus, content_transformer(tolower))
-corpus.temp <- tm_map(corpus.temp, removePunctuation)
-corpus.temp <- tm_map(corpus.temp, stripWhitespace)
-corpus.temp <- tm_map(corpus.temp, removeWords, stopwords("english"))
-corpus.temp <- tm_map(corpus.temp, stemDocument, language = "english")
-teste <- tm_map(corpus.temp, stemCompletion, type = "prevalent", dictionary = corpus)
-
-
-# Make a document-term matrix
-dtm <- DocumentTermMatrix(corpus)
-dtm
-
 # Goal 1 - Compare term frequency over time ('98-'17) 
+vector.of.years <- unique(reviews$year)
+list.of.dataframes <- list()
+
+for (i in 1:length(vector.of.years)){
+  temp.data <- filter(reviews, year == vector.of.years[i])
+  
+  review_source <- VectorSource(temp.data$text.title.abstract)
+  corpus <- Corpus(review_source)
+  
+  # Clean corpus
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, stripWhitespace)
+  corpus <- tm_map(corpus, removeWords, stopwords("english"))
+  #corpus <- tm_map(corpus, stemDocument, language = "english")
+  #corpus <- stemCompletion(corpus.temp, corpus, type = "prevalent") # Try to stem words
+  
+  # Make a document-term matrix
+  dtm <- DocumentTermMatrix(corpus)
+  dtm <- TermDocumentMatrix(corpus)
+  dtm.matrix <- as.matrix(dtm)
+  term.freq <- rowSums(dtm.matrix)
+  
+  temp.data <- data.frame(year = vector.of.years[i],
+                          word = names(term.freq),
+                          frequency = term.freq)
+  
+  temp.data <- arrange(temp.data, desc(frequency))
+  
+  list.of.dataframes[[i]] <- temp.data
+  
+}
+
+data <- do.call(rbind, list.of.dataframes)
+
+# Create frequency table with all years
+table_3 <- 
+  data %>%
+  group_by(word) %>%
+  summarise(freq = sum(frequency)) %>%
+  arrange(desc(freq))
+
+
+
 # Goal 2 - Cluster terms 
 # Goal 3 - Cluster terms and compare with other features
 # Goal 4 - How many times the term 'recombinant' shows up for each patent (row)
