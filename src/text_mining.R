@@ -7,8 +7,21 @@ library(tidyverse)
 library(tm)
 
 # Load Data
-setwd("C://Users//santo//OneDrive//Documents//R//text mining")
-reviews <- read.csv("reviews.csv", stringsAsFactors=FALSE)
+reviews <- read.csv2("~/Patent_Analysis/data/bovino_sel_complet.csv", 
+                    stringsAsFactors=FALSE)
+
+
+# Data prep ---------------------------------------------------------------
+
+reviews$year <- str_extract(reviews$Priority.numbers, 
+                            "([\\d+]{4})")
+
+reviews$country <- str_extract(reviews$Priority.numbers, 
+                            "([A-z]{2})")
+
+
+
+# Sandbox TM --------------------------------------------------------------
 
 # Combine rows
 review_text <- paste(reviews$text, collapse =" ")
