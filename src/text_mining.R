@@ -10,6 +10,8 @@ library(tm)
 reviews <- read.csv2("~/Patent_Analysis/data/bovino_sel.csv", 
                     stringsAsFactors=FALSE)
 
+reviews <- read.csv2("bovino_sel.csv", 
+                     stringsAsFactors=FALSE)
 
 # Data prep ---------------------------------------------------------------
 
