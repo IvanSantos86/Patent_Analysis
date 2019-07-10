@@ -7,7 +7,7 @@ library(tidyverse)
 library(tm)
 
 # Load Data
-reviews <- read.csv2("~/Patent_Analysis/data/bovino_sel_complet.csv", 
+reviews <- read.csv2("~/Patent_Analysis/data/bovino_sel.csv", 
                     stringsAsFactors=FALSE)
 
 
