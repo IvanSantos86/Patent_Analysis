@@ -1,6 +1,7 @@
 # Patent analysis using text mining
 # Author:
-# Ivan Santos
+# Ivan Santos, Ph.D.
+# Henrique Gomide, Ph.D
 # License: MIT
 
 library(tidyverse)
