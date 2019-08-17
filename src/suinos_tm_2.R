@@ -6,9 +6,10 @@ library(tm)
 library(lubridate)
 library(ggthemes)
 library(jtools)
+library(qdap)
 
 # Load Data
-data <- read.csv2("~/Patent_Analysis/data/data_all.csv", 
+data <- read.csv2("~/GitHub/Patent_Analysis/data/data_all.csv", 
                     stringsAsFactors = FALSE)
 
 # Selecionar qual banco de dados você fará a análise: 
@@ -18,7 +19,24 @@ data <- read.csv2("~/Patent_Analysis/data/data_all.csv",
 
 ### 1. Evolução Temporal dos depósitos de patentes
 
+<<<<<<< HEAD
 ## Data preparation ---------------------------------------------------------------
+=======
+# Selecionar qual banco de dados você fará a análise
+data <- filter(data, host == "avian")
+
+table_country <- data.frame(data$p.year, data$p.country)
+table_country$p.year <- as.character(table_country$p.year)
+table_country$p.year <- as.numeric(table_country$p.year)
+table_country$p.country <- fct_lump(table_country$p.country,
+                                                    n = 5)  
+
+
+#1.1 grafico: Patentes x Pais de prioridade x Ano
+table_country %>% count(year, p.country) %>% 
+  ggplot(aes(p.year, n, fill = p.country)) +
+  geom_bar(stat = 'identity')
+>>>>>>> 93f034488535416f489e64c21c997aff11970ade
 
 # Extração do ano e país de prioridade
 data$year    <- str_extract(data$priority_number,"([\\d+]{4})")
@@ -98,9 +116,14 @@ createTermFrequencyDf <- function (data, variable, uniqueKeyword = TRUE){
 title_abs_unique <- createTermFrequencyDf(data, "text.title.abstract", uniqueKeyword = TRUE)
 title_abs_freq   <- createTermFrequencyDf(data, "text.titla.abstract", uniqueKeyword = FALSE)
 
+<<<<<<< HEAD
 # Create Frequency Terms for Claims
 claims_unique  <- createTermFrequencyDf(data, "claims", uniqueKeyword = TRUE)
 claims_freq    <- createTermFrequencyDf(data, "claims", uniqueKeyword = FALSE)
+=======
+data.unique <- createTermFrequencyDf(data, "text.title.abstract", uniqueKeyword = TRUE)
+data1       <- createTermFrequencyDf(data, "text.title.abstract", uniqueKeyword = FALSE)
+>>>>>>> 93f034488535416f489e64c21c997aff11970ade
 
 
 #Tabela de frequencia de termos somando todos os anos
@@ -162,39 +185,40 @@ table_tm.cl <-
 terms.of.interest <- c("attenuated", "inactivated", "recombinant", "strain")
 
 #Grafico frequencia de termos (1 por patente) por anos
-chart_1<- data.unique %>%
+chart_3<- data.cl.unique %>%
   filter(word %in% terms.of.interest) %>%
   mutate(year = year(as.Date(year, format = "%Y")),
          year_cut = cut(year, breaks = 2))
 #linha
-ggplot(data = chart_1, 
+ggplot(data = chart_3, 
        aes(x = year, y = frequency,
            fill = word, colour = word)) +
   geom_line()
 
 #coluna
-ggplot(data = chart_1, 
+ggplot(data = chart_3, 
        aes(x = year_cut, fill = word)) +
   geom_bar(position = position_dodge())
 
 
 #Grafico frequencia de termos total por anos
-chart_2 <- data1 %>%
+chart_4 <- data.cl.1 %>%
   filter(word %in% terms.of.interest) %>%
   mutate(year = year(as.Date(year, format = "%Y")),
          year_cut = cut(year, breaks = 2))
 #linha
-ggplot(data = chart_2, 
+ggplot(data = chart_4, 
        aes(x = year, y = frequency,
            fill = word, colour = word)) +
   geom_line()
 
 #coluna
-ggplot(data = chart_2, 
+ggplot(data = chart_4, 
        aes(x = year_cut, fill = word)) +
   geom_bar(position = position_dodge())
 
 
+<<<<<<< HEAD
 # Charts ------------------------------------------------------------------
 
 # Gráfico com todos os tipos de hospedeiros
@@ -247,3 +271,69 @@ table_ipc %>%
 # table_suinos_assignee  %>%  count(priority.date.1, assignee)%>% 
 #   ggplot(aes(priority.date.1,n,fill=assignee)) +
 #   geom_bar(stat='identity')
+
+
+
+
+# Word Associations -------------------------------------------------------
+
+## Associações com os termos "attenuated", "inactivated", "recombinant", "strain"
+word_ass<- data.frame(doc_id=seq(1:nrow(data)),text=data$text.title.abstract)
+
+corpus.wa <- VCorpus(DataframeSource(word_ass))
+
+clean.corpus<-function(corpus){
+  corpus <- tm_map(corpus, content_transformer(tryTolower))
+  corpus <- tm_map(corpus, removeWords, stopwords("english"))
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, stripWhitespace)
+  corpus <- tm_map(corpus, removeNumbers)
+  return(corpus)
+}
+
+corpus.wa<-clean.corpus(corpus.wa)
+
+tdm.wa<-TermDocumentMatrix(corpus.wa,control=list(weighting=weightTf))
+
+associations.recom<-findAssocs(tdm.wa, 'recombinant', 0.2)
+associations.recom<-as.data.frame(associations.recom)
+associations.recom$terms<-row.names(associations.recom)
+associations.recom$terms<-factor(associations.recom$terms,
+                           levels=associations.recom$terms)
+
+ggplot(associations.recom, aes(y=terms)) +
+  geom_point(aes(x=recombinant), data=associations.recom,
+             size=5)+
+  theme_gdocs()+ geom_text(aes(x=recombinant,
+                               label=recombinant),
+                           colour="darkred",hjust=-.25,size=8)+
+  theme(text=element_text(size=20),
+        axis.title.y=element_blank())
+
+
+
+associations.inac<-findAssocs(tdm.wa, 'inactivated', 0.25)
+associations.inac<-as.data.frame(associations.inac)
+associations.inac$terms<-row.names(associations.inac)
+associations.inac$terms<-factor(associations.inac$terms,
+                                 levels=associations.inac$terms)
+
+
+ggplot(associations.inac, aes(y=terms)) +
+  geom_point(aes(x=inactivated), data=associations.inac,
+             size=5)+
+  theme_gdocs()+ geom_text(aes(x=inactivated,
+                               label=inactivated),
+                           colour="darkred",hjust=-.25,size=8)+
+  theme(text=element_text(size=20),
+        axis.title.y=element_blank())
+
+###Word Network
+
+recombinant<-data[grep("recombinant", data$text.title.abstract,ignore.case=T),]
+word_network_plot(recombinant$text.title.abstract[1:10], stopwords = "english")
+
+word_associate (word_ass$text,match.string=c('recombinant'),
+               stopwords=Top200Words,network.plot = T,
+               cloud.colors=c("gray85","darkred"))
+
