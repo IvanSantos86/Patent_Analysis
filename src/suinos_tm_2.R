@@ -17,11 +17,8 @@ data <- read.csv2("~/GitHub/Patent_Analysis/data/data_all.csv",
 #                    "suin", "mult_sp" 
 # data <- filter(data, host == "avian")
 
-### 1. Evolução Temporal dos depósitos de patentes
 
-<<<<<<< HEAD
 ## Data preparation ---------------------------------------------------------------
-=======
 # Selecionar qual banco de dados você fará a análise
 data <- filter(data, host == "avian")
 
@@ -31,12 +28,6 @@ table_country$p.year <- as.numeric(table_country$p.year)
 table_country$p.country <- fct_lump(table_country$p.country,
                                                     n = 5)  
 
-
-#1.1 grafico: Patentes x Pais de prioridade x Ano
-table_country %>% count(year, p.country) %>% 
-  ggplot(aes(p.year, n, fill = p.country)) +
-  geom_bar(stat = 'identity')
->>>>>>> 93f034488535416f489e64c21c997aff11970ade
 
 # Extração do ano e país de prioridade
 data$year    <- str_extract(data$priority_number,"([\\d+]{4})")
@@ -116,14 +107,10 @@ createTermFrequencyDf <- function (data, variable, uniqueKeyword = TRUE){
 title_abs_unique <- createTermFrequencyDf(data, "text.title.abstract", uniqueKeyword = TRUE)
 title_abs_freq   <- createTermFrequencyDf(data, "text.titla.abstract", uniqueKeyword = FALSE)
 
-<<<<<<< HEAD
+
 # Create Frequency Terms for Claims
 claims_unique  <- createTermFrequencyDf(data, "claims", uniqueKeyword = TRUE)
 claims_freq    <- createTermFrequencyDf(data, "claims", uniqueKeyword = FALSE)
-=======
-data.unique <- createTermFrequencyDf(data, "text.title.abstract", uniqueKeyword = TRUE)
-data1       <- createTermFrequencyDf(data, "text.title.abstract", uniqueKeyword = FALSE)
->>>>>>> 93f034488535416f489e64c21c997aff11970ade
 
 
 #Tabela de frequencia de termos somando todos os anos
@@ -218,8 +205,9 @@ ggplot(data = chart_4,
   geom_bar(position = position_dodge())
 
 
-<<<<<<< HEAD
 # Charts ------------------------------------------------------------------
+
+# 1. Evolução Temporal dos depósitos de patentes ----
 
 # Gráfico com todos os tipos de hospedeiros
 ## Fig1.1 - Todos os tipos de hosts ----
