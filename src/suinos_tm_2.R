@@ -7,81 +7,95 @@ library(tm)
 library(lubridate)
 
 # Load Data
-suinos <- read.csv2("~/GitHub/Patent_Analysis/data/suino_sel.csv", 
-                    stringsAsFactors=FALSE)
+data <- read.csv2("~/Patent_Analysis/data/data_all.csv", 
+                    stringsAsFactors = FALSE)
 
 ### 1. Evolução Temporal dos depósitos
+
 ## Data preparation ---------------------------------------------------------------
 
 # Ano de prioridade
 # Extração do ano de prioridade
-suinos$p.year <- str_extract(suinos$Priority.numbers,"([\\d+]{4})")
-
+data$p.year <- str_extract(data$priority_number,"([\\d+]{4})")
 
 # Pais de prioridade
 #Extração do país de prioridade
-suinos$p.country <- str_extract(suinos$Priority.numbers,"([A-z]{2})")
+data$p.country <- str_extract(data$priority_number,"([A-z]{2})")
 
-table_suinos_p.country <- data.frame(suinos$p.year, suinos$p.country)
+
+# Selecionar qual banco de dados você fará a análise
+table(data$host)
+
+table_country <- data.frame(data$p.year, data$p.country)
+table_country$p.year <- as.character(table_country$p.year)
+table_country$p.year <- as.numeric(table_country$p.year)
+table_country$p.country <- fct_lump(table_country$p.country,
+                                                    n = 5)  
+
 
 #1.1 grafico: Patentes x Pais de prioridade x Ano
-table_suinos_p.country  %>%  count(suinos.p.year, suinos.p.country)%>% 
-  ggplot(aes(suinos.p.year,n,fill=suinos.p.country)) +
-  geom_bar(stat='identity')
+table_country %>% count(year, p.country) %>% 
+  ggplot(aes(p.year, n, fill = p.country)) +
+  geom_bar(stat = 'identity')
 
-##TODO: filtrar top 5 de cada ano
 
 #IPCs
 #Separar IPCs
 
-a <- strsplit(suinos$IPC...International.classification, "\n")
+a <- strsplit(data$ipc, "\n")
 a <- max(sapply(a, length))
 
-suinos <- separate(suinos, 
-           col=IPC...International.classification,
+data <- separate(data, 
+           col=  ipc,
            sep = "\n", 
            into = paste0("ipc.", 
                          seq(1, a)))
 
-table_suinos_ipc <- gather(suinos, str_subset(names(suinos), "ipc."), 
+table_ipc <- gather(data, str_subset(names(data), "ipc."), 
                   key = "ipc",
                   value = "ipc.code") %>%
   filter(ipc.code != "") %>%
   select(p.year, ipc.code)
 
 # Extrair IPC nivel classe
-table_suinos_ipc$ipc.s <- str_extract(table_suinos_ipc$ipc.code, "[^/]+")
+table_ipc$p.year  <- as.numeric(as.character((table_ipc$p.year)))
+table_ipc$ipc.s   <- str_extract(table_ipc$ipc.code, "[^/]+")
+table_ipc$ipc.s   <- fct_lump(table_ipc$ipc.s, n = 6) 
+table_ipc$ipc.code   <- fct_lump(table_ipc$ipc.code, n = 6) 
+
+table_ipc <- filter(table_ipc, ipc.s != "A61K-039")
+table_ipc <- filter(table_ipc, !grepl("A61K-039*", ipc.code))
 
 #1.2 grafico: Patentes x IPC x Ano
-table_suinos_ipc  %>%  count(p.year, ipc.s)%>% 
+table_ipc  %>%  count(p.year, ipc.s)%>% 
   ggplot(aes(p.year,n,fill=ipc.s)) +
   geom_bar(stat='identity')
 
-##TODO: filtrar top 5 de cada ano
-
-#Depositantes
-#depositantes pos-openrefine
-table_suinos_assignee <- read.csv2("~/GitHub/Patent_Analysis/data/suinos_sel_year.assignee.or.csv")
-
-#1.3 grafico: Patentes x Depositante x Ano
-table_suinos_assignee  %>%  count(priority.date.1, assignee)%>% 
-  ggplot(aes(priority.date.1,n,fill=assignee)) +
+table_ipc  %>%  count(p.year, ipc.code)%>% 
+  ggplot(aes(p.year,n,fill=ipc.code)) +
   geom_bar(stat='identity')
 
-##TODO: filtrar top 5 de cada ano
+
+# Depositantes - we need to get back here when we're done -----------------
+# 
+# table_suinos_assignee <- read.csv2("~/GitHub/Patent_Analysis/data/suinos_sel_year.assignee.or.csv")
+# 
+# #1.3 grafico: Patentes x Depositante x Ano
+# table_suinos_assignee  %>%  count(priority.date.1, assignee)%>% 
+#   ggplot(aes(priority.date.1,n,fill=assignee)) +
+#   geom_bar(stat='identity')
 
 
-###Statistical Text Mining
+# Statistical text mining -------------------------------------------------
 
 ##Frequencia de termos por ano baseado no titulo e resumo
 # Combinar colunas titulo e resumos
-suinos$text.title.abstract <- paste(suinos$Title, suinos$Abstract,sep =" ")
+data$text.title.abstract <- paste(data$title, data$abstract,sep =" ")
 
-data <- suinos
 
 # frequencia de termos por ano
 #criar corpus
-createTermFrequencyDf <- function (data, uniqueKeyword = TRUE){
+createTermFrequencyDf <- function (data, variable, uniqueKeyword = TRUE){
   
   # Create data frame with term frequency data
   # Arguments:
@@ -94,7 +108,7 @@ createTermFrequencyDf <- function (data, uniqueKeyword = TRUE){
   
   for (i in 1:length(vector.of.years)){
     temp.data <- filter(data, p.year == vector.of.years[i])
-    review_source <- VectorSource(temp.data$text.title.abstract)
+    review_source <- VectorSource(eval(parse(text = paste0("temp.data$", variable))))
     corpus <- VCorpus(review_source)
     
     # Clean corpus
@@ -125,8 +139,9 @@ createTermFrequencyDf <- function (data, uniqueKeyword = TRUE){
   data <- do.call(rbind, list.of.dataframes)
 }
 
-data.unique <- createTermFrequencyDf(suinos, uniqueKeyword = TRUE)
-data1       <- createTermFrequencyDf(suinos, uniqueKeyword = FALSE)
+
+data.unique <- createTermFrequencyDf(data, "text.title.abstract", uniqueKeyword = TRUE)
+data1       <- createTermFrequencyDf(data, "text.titla.abstract", uniqueKeyword = FALSE)
 
 
 #Tabela de frequencia de termos somando todos os anos
@@ -174,55 +189,10 @@ ggplot(data = chart_2,
 
 
 ##Frequencia de termos por ano baseado nas reivindicações
-data <- suinos
 
 #criar corpus
-createTermFrequencyDf.cl <- function (data, uniqueKeyword = TRUE){
-  
-  # Create data frame with term frequency data
-  # Arguments:
-  #   data: dataframe which must have an year column
-  #   distinct: do you need distinct keywords for each document
-  #             or the summed keywords? Default = TRUE
-  
-  vector.of.years.cl <- unique(data$p.year)
-  list.of.dataframes.cl <- list()
-  
-  for (i in 1:length(vector.of.years.cl)){
-    temp.data.cl <- filter(data, p.year == vector.of.years.cl[i])
-    review_source_cl <- VectorSource(temp.data.cl$Claims)
-    corpus.cl <- VCorpus(review_source_cl)
-    
-    # Clean corpus
-    corpus.cl <- tm_map(corpus.cl, content_transformer(tolower))
-    corpus.cl <- tm_map(corpus.cl, removePunctuation)
-    corpus.cl <- tm_map(corpus.cl, stripWhitespace)
-    corpus.cl <- tm_map(corpus.cl, removeWords, stopwords("english"))
-    #corpus <- tm_map(corpus, stemDocument, language = "english")
-    #corpus <- stemCompletion(corpus.temp, corpus, type = "prevalent") # Try to stem words
-    
-    dtm.cl <- TermDocumentMatrix(corpus.cl)
-    dtm.matrix.cl <- as.matrix(dtm.cl)
-    
-    if (uniqueKeyword == TRUE) {
-      dtm.matrix.cl <- apply(dtm.matrix.cl, 2, function(x) ifelse(x > 0, 1, 0))
-    }
-    
-    term.freq.cl <- rowSums(dtm.matrix.cl)
-    temp.data.cl <- data.frame(year = vector.of.years[i],
-                            word = names(term.freq.cl),
-                            frequency = term.freq.cl)
-    
-    temp.data.cl <- arrange(temp.data.cl, desc(frequency))
-    
-    list.of.dataframes.cl[[i]] <- temp.data.cl
-    
-  }
-  data.cl <- do.call(rbind, list.of.dataframes.cl)
-}
-
-data.cl.unique <- createTermFrequencyDf(suinos, uniqueKeyword = TRUE)
-data.cl.1       <- createTermFrequencyDf(suinos, uniqueKeyword = FALSE)
+data.cl.unique  <- createTermFrequencyDf(data, "claims", uniqueKeyword = TRUE)
+data.cl.1       <- createTermFrequencyDf(data, "claims", uniqueKeyword = FALSE)
 
 
 #Tabela de frequencia de termos somando todos os anos

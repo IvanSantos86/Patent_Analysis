@@ -16,7 +16,7 @@ reviews <- read.csv2("bovino_sel.csv",
 
 # Data prep ---------------------------------------------------------------
 
-# Extract year from string using Regular Expressions
+# Extract year from string using regular expressions
 reviews$year <- str_extract(reviews$Priority.numbers, 
                             "([\\d+]{4})")
 
@@ -44,7 +44,6 @@ table_1 <- gather(reviews, "assignee.1", "assignee.2", "assignee.3",
                   value = "assignee.name") %>%
   filter(assignee.name != "") %>%
   select(year, assignee.name)
-
 
 
 a <- strsplit(reviews$IPC...International.classification, "\n")
