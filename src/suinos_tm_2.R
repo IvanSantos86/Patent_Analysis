@@ -1,47 +1,34 @@
-# Patent analysis using text mining
-# Ivan Santos
-## Vacinas suinos
+# Patent analysis 
+# Ivan Santos, Ph.D.
 
 library(tidyverse)
 library(tm)
 library(lubridate)
+library(ggthemes)
+library(jtools)
 
 # Load Data
 data <- read.csv2("~/Patent_Analysis/data/data_all.csv", 
                     stringsAsFactors = FALSE)
 
-### 1. Evolução Temporal dos depósitos
+# Selecionar qual banco de dados você fará a análise: 
+# Valores possíveis: "avian", "avian_flu", "bovin", 
+#                    "suin", "mult_sp" 
+# data <- filter(data, host == "avian")
+
+### 1. Evolução Temporal dos depósitos de patentes
 
 ## Data preparation ---------------------------------------------------------------
 
-# Ano de prioridade
-# Extração do ano de prioridade
-data$p.year <- str_extract(data$priority_number,"([\\d+]{4})")
+# Extração do ano e país de prioridade
+data$year    <- str_extract(data$priority_number,"([\\d+]{4})")
+data$country <- str_extract(data$priority_number,"([A-z]{2})")
 
-# Pais de prioridade
-#Extração do país de prioridade
-data$p.country <- str_extract(data$priority_number,"([A-z]{2})")
+data$year        <- as.numeric(data$year)  # Convert year as numeric
+data$country.rec <- fct_lump(data$country, # Reduce the number of factors
+                             n = 5)  
 
-
-# Selecionar qual banco de dados você fará a análise
-table(data$host)
-
-table_country <- data.frame(data$p.year, data$p.country)
-table_country$p.year <- as.character(table_country$p.year)
-table_country$p.year <- as.numeric(table_country$p.year)
-table_country$p.country <- fct_lump(table_country$p.country,
-                                                    n = 5)  
-
-
-#1.1 grafico: Patentes x Pais de prioridade x Ano
-table_country %>% count(year, p.country) %>% 
-  ggplot(aes(p.year, n, fill = p.country)) +
-  geom_bar(stat = 'identity')
-
-
-#IPCs
-#Separar IPCs
-
+# Separar IPCs
 a <- strsplit(data$ipc, "\n")
 a <- max(sapply(a, length))
 
@@ -51,63 +38,31 @@ data <- separate(data,
            into = paste0("ipc.", 
                          seq(1, a)))
 
-table_ipc <- gather(data, str_subset(names(data), "ipc."), 
-                  key = "ipc",
-                  value = "ipc.code") %>%
-  filter(ipc.code != "") %>%
-  select(p.year, ipc.code)
+rm(a)
 
-# Extrair IPC nivel classe
-table_ipc$p.year  <- as.numeric(as.character((table_ipc$p.year)))
-table_ipc$ipc.s   <- str_extract(table_ipc$ipc.code, "[^/]+")
-table_ipc$ipc.s   <- fct_lump(table_ipc$ipc.s, n = 6) 
-table_ipc$ipc.code   <- fct_lump(table_ipc$ipc.code, n = 6) 
-
-table_ipc <- filter(table_ipc, ipc.s != "A61K-039")
-table_ipc <- filter(table_ipc, !grepl("A61K-039*", ipc.code))
-
-#1.2 grafico: Patentes x IPC x Ano
-table_ipc  %>%  count(p.year, ipc.s)%>% 
-  ggplot(aes(p.year,n,fill=ipc.s)) +
-  geom_bar(stat='identity')
-
-table_ipc  %>%  count(p.year, ipc.code)%>% 
-  ggplot(aes(p.year,n,fill=ipc.code)) +
-  geom_bar(stat='identity')
-
-
-# Depositantes - we need to get back here when we're done -----------------
-# 
-# table_suinos_assignee <- read.csv2("~/GitHub/Patent_Analysis/data/suinos_sel_year.assignee.or.csv")
-# 
-# #1.3 grafico: Patentes x Depositante x Ano
-# table_suinos_assignee  %>%  count(priority.date.1, assignee)%>% 
-#   ggplot(aes(priority.date.1,n,fill=assignee)) +
-#   geom_bar(stat='identity')
-
-
-# Statistical text mining -------------------------------------------------
-
-##Frequencia de termos por ano baseado no titulo e resumo
 # Combinar colunas titulo e resumos
-data$text.title.abstract <- paste(data$title, data$abstract,sep =" ")
+data$text.title.abstract <- paste(data$title, 
+                                  data$abstract,sep =" ")
 
 
-# frequencia de termos por ano
-#criar corpus
+## Frequencia de termos por ano baseado no titulo e resumo
+# Frequencia de termos por ano
+# Criar corpus
+
 createTermFrequencyDf <- function (data, variable, uniqueKeyword = TRUE){
   
   # Create data frame with term frequency data
   # Arguments:
   #   data: dataframe which must have an year column
+  #   variable: variable of interest
   #   distinct: do you need distinct keywords for each document
   #             or the summed keywords? Default = TRUE
   
-  vector.of.years <- unique(data$p.year)
+  vector.of.years <- unique(data$year)
   list.of.dataframes <- list()
   
   for (i in 1:length(vector.of.years)){
-    temp.data <- filter(data, p.year == vector.of.years[i])
+    temp.data <- filter(data, year == vector.of.years[i])
     review_source <- VectorSource(eval(parse(text = paste0("temp.data$", variable))))
     corpus <- VCorpus(review_source)
     
@@ -139,14 +94,18 @@ createTermFrequencyDf <- function (data, variable, uniqueKeyword = TRUE){
   data <- do.call(rbind, list.of.dataframes)
 }
 
+# Create Frequency Terms for Title+Abstracts
+title_abs_unique <- createTermFrequencyDf(data, "text.title.abstract", uniqueKeyword = TRUE)
+title_abs_freq   <- createTermFrequencyDf(data, "text.titla.abstract", uniqueKeyword = FALSE)
 
-data.unique <- createTermFrequencyDf(data, "text.title.abstract", uniqueKeyword = TRUE)
-data1       <- createTermFrequencyDf(data, "text.titla.abstract", uniqueKeyword = FALSE)
+# Create Frequency Terms for Claims
+claims_unique  <- createTermFrequencyDf(data, "claims", uniqueKeyword = TRUE)
+claims_freq    <- createTermFrequencyDf(data, "claims", uniqueKeyword = FALSE)
 
 
 #Tabela de frequencia de termos somando todos os anos
-table_tm.tiabs <- 
-  data1 %>%
+chart_2.1 <- 
+  title_abs_unique %>%
   group_by(word) %>%
   summarise(freq = sum(frequency)) %>%
   arrange(desc(freq))
@@ -191,8 +150,6 @@ ggplot(data = chart_2,
 ##Frequencia de termos por ano baseado nas reivindicações
 
 #criar corpus
-data.cl.unique  <- createTermFrequencyDf(data, "claims", uniqueKeyword = TRUE)
-data.cl.1       <- createTermFrequencyDf(data, "claims", uniqueKeyword = FALSE)
 
 
 #Tabela de frequencia de termos somando todos os anos
@@ -236,3 +193,57 @@ ggplot(data = chart_2,
 ggplot(data = chart_2, 
        aes(x = year_cut, fill = word)) +
   geom_bar(position = position_dodge())
+
+
+# Charts ------------------------------------------------------------------
+
+# Gráfico com todos os tipos de hospedeiros
+## Fig1.1 - Todos os tipos de hosts ----
+data %>% 
+  group_by(host) %>%
+  count(year, country.rec) %>%
+  ggplot(aes(year, n, fill = country.rec)) +
+  geom_bar(stat = "identity") + 
+  facet_wrap( ~ host, nrow = 2) +
+  theme_apa() + 
+  theme(legend.position = "bottom") +
+  ylab("") + xlab("") +
+  scale_fill_brewer(palette = "Dark2", type = "qual")
+
+
+# Fig1.2. IPC por ano ----
+table_ipc <- gather(data, str_subset(names(data), "ipc."), 
+                  key = "ipc",
+                  value = "ipc.code") %>%
+  filter(ipc.code != "") %>%
+  select(year, ipc.code)
+
+# Extrair IPC nivel classe
+table_ipc$ipc.s   <- str_extract(table_ipc$ipc.code, "[^/]+")
+table_ipc$ipc.s   <- fct_lump(table_ipc$ipc.s, n = 6) 
+table_ipc$ipc.code   <- fct_lump(table_ipc$ipc.code, n = 6) 
+
+# Remover códigos que já estavam na consulta da base de dados
+table_ipc <- filter(table_ipc, ipc.s != "A61K-039")
+table_ipc <- filter(table_ipc, !grepl("A61K-039*", ipc.code))
+
+# Plot figure
+table_ipc %>% 
+  count(year, ipc.s) %>% 
+  ggplot(aes(year, n, fill = ipc.s, col = ipc.s)) +
+  #geom_bar(stat='identity') +
+  geom_area() +
+  theme_apa() + 
+  theme(legend.position = "bottom") +
+  ylab("") + xlab("") +
+  scale_fill_brewer(palette = "Dark2", type = "qual") +
+  scale_color_brewer(palette = "Dark2", type = "qual") 
+
+# Depositantes - we need to get back here when we're done -----------------
+# 
+# table_suinos_assignee <- read.csv2("~/GitHub/Patent_Analysis/data/suinos_sel_year.assignee.or.csv")
+# 
+# #1.3 grafico: Patentes x Depositante x Ano
+# table_suinos_assignee  %>%  count(priority.date.1, assignee)%>% 
+#   ggplot(aes(priority.date.1,n,fill=assignee)) +
+#   geom_bar(stat='identity')
