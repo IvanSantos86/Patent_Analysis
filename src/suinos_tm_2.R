@@ -10,7 +10,7 @@ library(qdap)
 
 # Load Data
 data <- read.csv2("~/GitHub/Patent_Analysis/data/data_all.csv", 
-                    stringsAsFactors = FALSE)
+                  stringsAsFactors = FALSE)
 
 # Selecionar qual banco de dados você fará a análise: 
 # Valores possíveis: "avian", "avian_flu", "bovin", 
@@ -25,8 +25,7 @@ data <- filter(data, host == "avian")
 table_country <- data.frame(data$p.year, data$p.country)
 table_country$p.year <- as.character(table_country$p.year)
 table_country$p.year <- as.numeric(table_country$p.year)
-table_country$p.country <- fct_lump(table_country$p.country,
-                                                    n = 5)  
+table_country$p.country <- fct_lump(table_country$p.country, n = 5)  
 
 
 # Extração do ano e país de prioridade
@@ -42,23 +41,23 @@ a <- strsplit(data$ipc, "\n")
 a <- max(sapply(a, length))
 
 data <- separate(data, 
-           col=  ipc,
-           sep = "\n", 
-           into = paste0("ipc.", 
-                         seq(1, a)))
+                 col =  ipc,
+                 sep = "\n", 
+                 into = paste0("ipc.", 
+                               seq(1, a)))
 
 rm(a)
 
 # Combinar colunas titulo e resumos
 data$text.title.abstract <- paste(data$title, 
-                                  data$abstract,sep =" ")
+                                  data$abstract,sep = " ")
 
 
 ## Frequencia de termos por ano baseado no titulo e resumo
 # Frequencia de termos por ano
 # Criar corpus
 
-createTermFrequencyDf <- function (data, variable, uniqueKeyword = TRUE){
+createTermFrequencyDf <- function(data, variable, uniqueKeyword = TRUE){
   
   # Create data frame with term frequency data
   # Arguments:
@@ -123,7 +122,7 @@ chart_2.1 <-
 terms.of.interest <- c("attenuated", "inactivated", "recombinant", "strain")
 
 #2.1 Grafico: Frequencia de termos (1 por patente) x Ano
-chart_1<- data.unique %>%
+chart_1 <- data.unique %>%
   filter(word %in% terms.of.interest) %>%
   mutate(year = year(as.Date(year, format = "%Y")),
          year_cut = cut(year, breaks = 2))
@@ -172,7 +171,7 @@ table_tm.cl <-
 terms.of.interest <- c("attenuated", "inactivated", "recombinant", "strain")
 
 #Grafico frequencia de termos (1 por patente) por anos
-chart_3<- data.cl.unique %>%
+chart_3 <- data.cl.unique %>%
   filter(word %in% terms.of.interest) %>%
   mutate(year = year(as.Date(year, format = "%Y")),
          year_cut = cut(year, breaks = 2))
@@ -225,8 +224,8 @@ data %>%
 
 # Fig1.2. IPC por ano ----
 table_ipc <- gather(data, str_subset(names(data), "ipc."), 
-                  key = "ipc",
-                  value = "ipc.code") %>%
+                    key = "ipc",
+                    value = "ipc.code") %>%
   filter(ipc.code != "") %>%
   select(year, ipc.code)
 
@@ -252,25 +251,86 @@ table_ipc %>%
   scale_color_brewer(palette = "Dark2", type = "qual") 
 
 # Depositantes - we need to get back here when we're done -----------------
-# 
-# table_suinos_assignee <- read.csv2("~/GitHub/Patent_Analysis/data/suinos_sel_year.assignee.or.csv")
-# 
+# Passar dados
+table_suinos_assignee <- read.csv2("~/Patent_Analysis/data/suinos_sel_year.assignee.or.csv")
+table_suinos_assignee$assignee.s   <- fct_lump(table_suinos_assignee$assignee, n = 10) 
+
 # #1.3 grafico: Patentes x Depositante x Ano
-# table_suinos_assignee  %>%  count(priority.date.1, assignee)%>% 
-#   ggplot(aes(priority.date.1,n,fill=assignee)) +
-#   geom_bar(stat='identity')
+table_suinos_assignee %>% count(priority.date.1, assignee.s) %>% 
+  ggplot(aes(x = priority.date.1, y = n, fill = assignee.s)) +
+  geom_bar(stat = 'identity')
+
+# Count assignees
+table_count_assignees <- 
+  table_suinos_assignee %>%
+  group_by(assignee) %>%
+  summarise(freq = n()) %>%
+  arrange(desc(freq))
 
 
+# Create attributes for patent valuation -----------------------------------
+
+# 1. Select the first priority number
+data$first.priority.number <- gsub("\n(.*)", "", data$priority_number)
+
+# 2. Count inventors
+data$inventors.fr <- str_count(data$inventors, pattern = "\n") + 1
+
+# Count independent claims
+data$indep.claim.fr <-  str_count(data$indep_claim, pattern = "\n") 
+
+# Count frequency of patents by country
+
+first <- str_extract(data$family_publication, "[A-Z]{2}")
+temp <- str_extract_all(data$family_publication, "\n[A-Z]{2}")
+temp <- lapply(temp, function(x) gsub("\n", "", x))
+temp <- lapply(temp, function(x) c(x))
+temp <- lapply(temp, function(x) unique(x))
+temp <- lapply(temp, function(x) paste0(x, collapse = "|"))
+temp <- unlist(temp)
+temp <- paste(first , temp, sep = "|")
+temp <- str_extract_all(temp, "[A-Z]{2}")
+temp <- lapply(temp, function(x) unique(x))
+
+
+# Criar variável para contagem de países únicos por patente
+n <- lapply(temp, function(x) length(x))
+data$n.unique.contries <- unlist(n) 
+
+# Criar tabela com número de patentes por país
+temp <- lapply(temp, function(x) paste0(x, collapse = "|"))
+data$countries.list <- unlist(temp)
+a <- strsplit(data$countries.list, "\\|")
+a <- max(sapply(a, length))
+
+data <- separate(data, 
+                 col =  countries.list,
+                 sep = "\\|", 
+                 into = paste0("country.", 
+                               seq(1, a)))
+
+rm(a, temp, n)
+
+table_country <- 
+  gather(data, str_subset(names(data), "country\\.[1-99]"),
+         key = "country",
+         value = "country.code") %>%
+  filter(country.code != "") %>%
+  select(country.code) %>%
+  group_by(country.code) %>%
+  count(country.code) %>%
+  arrange(desc(n)) %>%
+  filter(country.code != "WO")
 
 
 # Word Associations -------------------------------------------------------
 
 ## Associações com os termos "attenuated", "inactivated", "recombinant", "strain"
-word_ass<- data.frame(doc_id=seq(1:nrow(data)),text=data$text.title.abstract)
+word_ass <- data.frame(doc_id=seq(1:nrow(data)),text=data$text.title.abstract)
 
 corpus.wa <- VCorpus(DataframeSource(word_ass))
 
-clean.corpus<-function(corpus){
+clean.corpus <- function(corpus) {
   corpus <- tm_map(corpus, content_transformer(tryTolower))
   corpus <- tm_map(corpus, removeWords, stopwords("english"))
   corpus <- tm_map(corpus, removePunctuation)
@@ -279,49 +339,50 @@ clean.corpus<-function(corpus){
   return(corpus)
 }
 
-corpus.wa<-clean.corpus(corpus.wa)
+corpus.wa <- clean.corpus(corpus.wa)
 
-tdm.wa<-TermDocumentMatrix(corpus.wa,control=list(weighting=weightTf))
+tdm.wa <- TermDocumentMatrix(corpus.wa,control = list(weighting = weightTf))
 
-associations.recom<-findAssocs(tdm.wa, 'recombinant', 0.2)
-associations.recom<-as.data.frame(associations.recom)
-associations.recom$terms<-row.names(associations.recom)
-associations.recom$terms<-factor(associations.recom$terms,
-                           levels=associations.recom$terms)
+associations.recom <- findAssocs(tdm.wa, 'recombinant', 0.2)
+associations.recom <- as.data.frame(associations.recom)
+associations.recom$terms <- row.names(associations.recom)
+associations.recom$terms <- factor(associations.recom$terms, 
+                                   levels = associations.recom$terms)
 
-ggplot(associations.recom, aes(y=terms)) +
-  geom_point(aes(x=recombinant), data=associations.recom,
-             size=5)+
-  theme_gdocs()+ geom_text(aes(x=recombinant,
-                               label=recombinant),
-                           colour="darkred",hjust=-.25,size=8)+
-  theme(text=element_text(size=20),
-        axis.title.y=element_blank())
-
-
-
-associations.inac<-findAssocs(tdm.wa, 'inactivated', 0.25)
-associations.inac<-as.data.frame(associations.inac)
-associations.inac$terms<-row.names(associations.inac)
-associations.inac$terms<-factor(associations.inac$terms,
-                                 levels=associations.inac$terms)
+ggplot(associations.recom, aes( y = terms)) +
+  geom_point(aes(x = recombinant), data = associations.recom,
+             size = 5) +
+  theme_gdocs() + 
+  geom_text(aes(x = recombinant,
+                label = recombinant),
+            colour = "darkred", hjust = -.25, size = 8) +
+  theme(text = element_text(size = 20),
+        axis.title.y = element_blank())
 
 
-ggplot(associations.inac, aes(y=terms)) +
-  geom_point(aes(x=inactivated), data=associations.inac,
-             size=5)+
-  theme_gdocs()+ geom_text(aes(x=inactivated,
-                               label=inactivated),
-                           colour="darkred",hjust=-.25,size=8)+
-  theme(text=element_text(size=20),
-        axis.title.y=element_blank())
 
-###Word Network
+associations.inac <- findAssocs(tdm.wa, 'inactivated', 0.25)
+associations.inac <- as.data.frame(associations.inac)
+associations.inac$terms <- row.names(associations.inac)
+associations.inac$terms <- factor(associations.inac$terms, 
+                                  levels = associations.inac$terms)
 
-recombinant<-data[grep("recombinant", data$text.title.abstract,ignore.case=T),]
+
+ggplot(associations.inac, aes(y = terms)) +
+  geom_point(aes(x = inactivated), data = associations.inac,
+             size = 5) +
+  theme_gdocs() + 
+  geom_text(aes(x = inactivated,
+                label = inactivated),
+            colour = "darkred", hjust = -.25, size = 8)+
+  theme(text = element_text(size = 20),
+        axis.title.y = element_blank())
+
+### Word Network
+recombinant <- data[grep("recombinant", data$text.title.abstract,ignore.case = TRUE),]
 word_network_plot(recombinant$text.title.abstract[1:10], stopwords = "english")
 
-word_associate (word_ass$text,match.string=c('recombinant'),
-               stopwords=Top200Words,network.plot = T,
-               cloud.colors=c("gray85","darkred"))
+word_associate(word_ass$text,match.string = c('recombinant'),
+               stopwords = Top200Words,network.plot = T,
+               cloud.colors = c("gray85","darkred"))
 
