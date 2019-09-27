@@ -9,23 +9,23 @@ library(jtools)
 #library(qdap)
 
 # Load Data
-# Lembrete: Avaliar de caminho do diretório é igual no Windows.
+# Lembrete: Avaliar de caminho do diret?rio ? igual no Windows.
 data <- read.csv2("~/Patent_Analysis/data/data_all.csv", 
                   stringsAsFactors = FALSE)
 
-# Selecionar qual banco de dados você fará a análise: 
-# Valores possíveis: "avian", "avian_flu", "bovin", 
+# Selecionar qual banco de dados voc? far? a an?lise: 
+# Valores poss?veis: "avian", "avian_flu", "bovin", 
 #                    "suin", "mult_sp" 
 # data <- filter(data, host == "avian")
 
 
-# 1. Evolução temporal dos depósitos de patentes --------------------------
-# 1.1 Preparação dos dados ================================================
+# 1. Evolu??o temporal dos dep?sitos de patentes --------------------------
+# 1.1 Prepara??o dos dados ================================================
 
-# Selecionar qual banco de dados você fará a análise
+# Selecionar qual banco de dados voc? far? a an?lise
 data <- filter(data, host == "avian")
 
-# Extração do ano e país de prioridade
+# Extra??o do ano e pa?s de prioridade
 data$year    <- str_extract(data$priority_number,"([\\d+]{4})")
 data$country <- str_extract(data$priority_number,"([A-z]{2})")
 
@@ -50,20 +50,20 @@ data$text.title.abstract <- paste(data$title,
                                   data$abstract,sep = " ")
 
 
-# Ler dados com padronização dos nomes dos assignees
+# Ler dados com padroniza??o dos nomes dos assignees
 table_suinos_assignee <- read.csv2("~/Patent_Analysis/data/suinos_sel_year.assignee.or.csv")
 table_suinos_assignee$assignee.s   <- fct_lump(table_suinos_assignee$assignee, n = 10) 
 
-# 1.2 Análise dos dados ==========================================================
+# 1.2 An?lise dos dados ==========================================================
 # Tables
-# 1. Tabela dos cinco principais países por ano.
+# 1. Tabela dos cinco principais pa?ses por ano.
 table_country <- data.frame(year = data$year, country = data$country)
 table_country$p.year <- as.character(table_country$year)
 table_country$p.year <- as.numeric(table_country$p.year)
 table_country$p.country <- fct_lump(table_country$country, n = 5)  
 
 
-# Gráfico com todos os tipos de hospedeiros
+# Gr?fico com todos os tipos de hospedeiros
 ## Fig1.1 - Todos os tipos de hosts ----
 data %>% 
   group_by(host) %>%
@@ -89,7 +89,7 @@ table_ipc$ipc.s   <- str_extract(table_ipc$ipc.code, "[^/]+")
 table_ipc$ipc.s   <- fct_lump(table_ipc$ipc.s, n = 6) 
 table_ipc$ipc.code   <- fct_lump(table_ipc$ipc.code, n = 6) 
 
-# Remover códigos que já estavam na consulta da base de dados
+# Remover c?digos que j? estavam na consulta da base de dados
 table_ipc <- filter(table_ipc, ipc.s != "A61K-039")
 table_ipc <- filter(table_ipc, !grepl("A61K-039*", ipc.code))
 
@@ -119,11 +119,11 @@ table_count_assignees <-
   arrange(desc(freq))
 
 
-# 2 Estatística da mineração dos textos -------------------------------------
+# 2 Estat?stica da minera??o dos textos -------------------------------------
 
-# 2.1 Preparação dos dados ===================================================
+# 2.1 Prepara??o dos dados ===================================================
 
-## Frequencia de termos por ano baseado no título e resumo
+## Frequencia de termos por ano baseado no t?tulo e resumo
 # Frequencia de termos por ano
 # Criar corpus
 createTermFrequencyDf <- function(data, variable, uniqueKeyword = TRUE,
@@ -193,7 +193,7 @@ claims_freq    <- createTermFrequencyDf(data, "claims", uniqueKeyword = FALSE,
                                         rfidf = FALSE)
 
 
-# 2.2 Análise dos dados ==========================================================
+# 2.2 An?lise dos dados ==========================================================
 # Tabela de frequencia de termos somando todos os anos
 chart_2.1 <- 
   title_abs_unique %>%
@@ -201,7 +201,7 @@ chart_2.1 <-
   summarise(freq = sum(frequency)) %>%
   arrange(desc(freq))
 
-# Finalizar dicionário e acrescentar termos quando estiverem prontos
+# Finalizar dicion?rio e acrescentar termos quando estiverem prontos
 terms.of.interest <- c("attenuated", "inactivated", "recombinant", "strain")
 
 # 2.1 Grafico: Frequencia de termos (1 por patente) x Ano
@@ -284,7 +284,7 @@ ggplot(data = chart_4,
   geom_bar(position = position_dodge())
 
 
-# 4 Análise de valor das patentes ----------------------------------------------
+# 4 An?lise de valor das patentes ----------------------------------------------
 
 # 4.1 Create attributes for patent valuation -----------------------------------
 # 1. Select the first priority number
@@ -310,11 +310,11 @@ temp <- str_extract_all(temp, "[A-Z]{2}")
 temp <- lapply(temp, function(x) unique(x))
 
 
-# Criar variável para contagem de países únicos por patente
+# Criar vari?vel para contagem de pa?ses ?nicos por patente
 n <- lapply(temp, function(x) length(x))
 data$n.unique.contries <- unlist(n) 
 
-# Criar tabela com número de patentes por país
+# Criar tabela com n?mero de patentes por pa?s
 temp <- lapply(temp, function(x) paste0(x, collapse = "|"))
 data$countries.list <- unlist(temp)
 a <- strsplit(data$countries.list, "\\|")
@@ -328,7 +328,7 @@ data <- separate(data,
 
 rm(a, temp, n)
 
-# 4.2 Análise dos dados ==========================================================
+# 4.2 An?lise dos dados ==========================================================
 table_country <- 
   gather(data, str_subset(names(data), "country\\.[1-99]"),
          key = "country",
@@ -341,9 +341,9 @@ table_country <-
   filter(country.code != "WO")
 
 
-# 3. Associação de palavras ----------------------------------------------------
+# 3. Associa??o de palavras ----------------------------------------------------
 
-## Associações com os termos "attenuated", "inactivated", "recombinant", "strain"
+## Associa??es com os termos "attenuated", "inactivated", "recombinant", "strain"
 word_ass <- data.frame(doc_id = seq(1:nrow(data)),
                        text = data$text.title.abstract)
 
@@ -362,8 +362,8 @@ corpus.wa <- clean.corpus(corpus.wa)
 
 tdm.wa <- TermDocumentMatrix(corpus.wa,control = list(weighting = weightTf))
 
-# TODO -  Explorar termos mais frequentes e de maior interesse da área para 
-# encontrar eventuais padrões e tecnologias
+# TODO -  Explorar termos mais frequentes e de maior interesse da ?rea para 
+# encontrar eventuais padr?es e tecnologias
 
 associations.recom <- findAssocs(tdm.wa, 'recombinant', 0.2)
 associations.recom <- as.data.frame(associations.recom)
@@ -412,48 +412,65 @@ word_associate(word_ass$text,match.string = c('recombinant'),
 # Affinity Propagation Clustering -----------------------------------------
 
 library(apcluster)
-
+library(cluster)
 
 # 1. Criar matrix patente vs. termo
-tdm_wa <- DocumentTermMatrix(corpus.wa, control = list(weighting = weightTf))
+tdm_wa <- DocumentTermMatrix(corpus.wa, control = list(weighting = weightTfIdf))
 tdm_wa <- as.matrix(tdm_wa)
 
-# Criar matrix de distâncias de dissimilaridade
-teste <- daisy(tdm_wa, metric = "euclidean", stand = FALSE)
-teste <- as.matrix(teste)
+# Muldimensional scaling for ploting data
+mds <- 
+  tdm_wa %>%
+  dist() %>%
+  cmdscale() %>%
+  as_tibble(.name_repair = "unique")
+colnames(mds) <- c("Dim.1", "Dim.2")
 
-# Ler metodologia do artigo original e tentar implementar algoritmo
+# Preparar dados para algoritmo de propaga??o por afinidade.
+# datacluster <- dist(tdm_wa) 
+datacluster <- as.matrix(mds)
+negMat      <- negDistMat(datacluster, r = 2)
+apmodel     <- apcluster(negMat)
 
-# tdm_wa <- apply(tdm_wa, 2, function(x) ifelse(x > 0, 1, 0))
+# Passar clusteres para banco de dados original
+data$cluster <- as.factor(apcluster::labels(apmodel, type = "enum"))
 
-rowCount <- nrow(tdm_wa)
-colCount <- ncol(tdm_wa)
-similMatrix = matrix(nrow = rowCount, ncol = rowCount)
+# Filtrar cluster
 
-
-similMatrix[ row(similMatrix) >= col(similMatrix) ] <- 0
-for (i in 1:(rowCount)) { # set all columns NA you can change to zeros if you need later
-  similMatrix[i,i] = NA
-} # then we will do the actual job
-for (i in 1:rowCount ) {  # rows
-  for (j in 1:rowCount ) {      # cols
-    if (is.na(similMatrix[i,j]) == FALSE) {
-      a = tdm_wa[i,]
-      b = tdm_wa[j,]
-      for (k in 1:colCount) {   #n number of Cols in Document term matrix
-        if (a[k] == 1 && a[k] == b[k]) {
-          similMatrix[i,j] = similMatrix[i,j] + 1
-        }
-      }
-    }
-  }
+frequentTermCluster <- function(data, n_cluster) {
+  
+  df_filtered <- subset(data, data$cluster == n_cluster)
+ 
+  corpus_filtered <- data.frame(doc_id = seq(1:nrow(df_filtered)),
+                                text = df_filtered$text.title.abstract)
+  
+  corpus_filtered <- VCorpus(DataframeSource(corpus_filtered))
+  corpus_filtered <- clean.corpus(corpus_filtered)
+  tda_filtered <- TermDocumentMatrix(corpus_filtered, 
+                                     control = list(weighting = weightTfIdf))
+  
+  tda_filtered <- as.matrix(tda_filtered)
+  words_list <- rowSums(tda_filtered)
+  terms <- sort(words_list, decreasing = TRUE)
+  
+  return(terms[1:10])
+  
 }
 
+frequentTermCluster(data, n_cluster = i)  
 
 
+# plotar experimentalmente os clusteres ----
+# Criar variÃ¡veis para plotar abaixo
+mds$country.r <- data$country.rec
+mds$year <- data$year
+mds$cluster <- as.factor(apcluster::labels(apmodel, type = "enum"))
 
-cluster <- apcluster(negDistMat(r = 2), tdm_wa.s, details = TRUE)
-plot(cluster)
+# Plot clusters
+library(ggpubr)
+ggscatter(mds, x = "Dim.1", y = "Dim.2",
+          color = "cluster",
+          repel = TRUE) +
+ facet_wrap(~ year) 
 
 
-acluster <- aggExCluster(negDistMat(r = 2), dtm.matrix)
