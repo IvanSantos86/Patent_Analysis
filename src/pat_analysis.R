@@ -8,6 +8,14 @@ library(ggthemes)
 library(jtools)
 library(qdap)
 
+cleanCorpus <- function(corpus) {
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  corpus <- tm_map(corpus, removeWords, stopwords("english"))
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, stripWhitespace)
+  corpus <- tm_map(corpus, removeNumbers)
+  return(corpus)
+}
 
 # Load Data
 #Windows
@@ -50,12 +58,16 @@ data$text.title.abstract <- paste(data$title,
 
 
 # Load data assignee names reviewed
+# Windows 
 table_assignee <- read.csv2("~/GitHub/Patent_Analysis/data/patentes_all_assignee_or.csv ")
+# Linux
+table_assignee <- read.csv2("~/Patent_Analysis/data/patentes_all_assignee_or.csv")
+
 table_assignee$assignee.s   <- fct_lump(table_assignee$Latest.standardized.assignees...inventors.removed, n = 10) 
 table_assignee$year.p    <- str_extract(table_assignee$Priority.dates,"([\\d+]{4})")
 
 # 1.2 Analise dos dados ==========================================================
-## Análise por hospedeiro
+## An?lise por hospedeiro
 
 ## Fig1.1 - Patentes x ano x Pais de prioridade  ---- Ok
 
@@ -67,11 +79,11 @@ table_country$p.country <- fct_lump(table_country$country, n = 5)
 
 # Plot Fig. 1.1
 data %>% 
-  group_by(host) %>%
+#  group_by(host) %>%
   count(year, country.rec) %>%
   ggplot(aes(year, n, fill = country.rec)) +
   geom_bar(stat = "identity") + 
-  facet_wrap( ~ host, nrow = 2) +
+#  facet_wrap( ~ host, nrow = 2) +
   theme_apa() + 
   theme(legend.position = "bottom") +
   ylab("") + xlab("") +
@@ -88,12 +100,14 @@ table_ipc <- gather(data, str_subset(names(data), "ipc."),
 
 # Extrair IPC nivel classe
 table_ipc$ipc.s   <- str_extract(table_ipc$ipc.code, "[^/]+")
-table_ipc$ipc.s   <- fct_lump(table_ipc$ipc.s, n = 6) 
-table_ipc$ipc.code   <- fct_lump(table_ipc$ipc.code, n = 6) 
+#table_ipc$ipc.s   <- fct_lump(table_ipc$ipc.s, n = 6) 
+#table_ipc$ipc.code   <- fct_lump(table_ipc$ipc.code, n = 6) 
 
 # Remover codigos que nao sao de interesse
 table_ipc <- filter(table_ipc, ipc.s != "A61K-039")
 table_ipc <- filter(table_ipc, !grepl("A61K-039*", ipc.code))
+#table_ipc <- filter(table_ipc, grepl("C12N-*", ipc.code)) # Caso queira fazer 
+# anÃ¡lise com C12N
 
 # Plot Fig. 1.2
 table_ipc %>% 
@@ -127,7 +141,7 @@ table_assignee %>% count(year.p, assignee.s) %>%
 
 # 2.1 Preparacao dos dados ===================================================
 
-## Frequencia de termos por ano baseado no titulo+resumo ou reivindicações
+## Frequencia de termos por ano baseado no titulo+resumo ou reivindica??es
 
 # Frequencia de termos por ano
 
@@ -149,20 +163,14 @@ createTermFrequencyDf <- function(data, variable, uniqueKeyword = TRUE,
     temp.data <- filter(data, year == vector.of.years[i])
     review_source <- VectorSource(eval(parse(text = paste0("temp.data$", variable))))
     corpus <- VCorpus(review_source)
-    
-    # Clean corpus
-    corpus <- tm_map(corpus, content_transformer(tolower))
-    corpus <- tm_map(corpus, removePunctuation)
-    corpus <- tm_map(corpus, stripWhitespace)
-    corpus <- tm_map(corpus, removeWords, stopwords("english"))
-    #corpus <- tm_map(corpus, stemDocument, language = "english")
-    #corpus <- stemCompletion(corpus.temp, corpus, type = "prevalent") # Try to stem words
+    corpus <- cleanCorpus(corpus)
     
     if (rfidf == TRUE) {
       dtm <- TermDocumentMatrix(corpus, control = list(weighting = weightTfIdf))
+    } else {
+      dtm <- TermDocumentMatrix(corpus)  
     }
     
-    dtm <- TermDocumentMatrix(corpus)
     dtm.matrix <- as.matrix(dtm)
     
     if (uniqueKeyword == TRUE) {
@@ -183,13 +191,14 @@ createTermFrequencyDf <- function(data, variable, uniqueKeyword = TRUE,
 }
 
 # Frequency Terms for Title+Abstracts
-title_abs_unique <- createTermFrequencyDf(data, "text.title.abstract", 
+title_abs_unique <- createTermFrequencyDf(data, 
+                                          "text.title.abstract", 
                                           uniqueKeyword = TRUE, 
-                                          rfidf = TRUE)
+                                          rfidf = FALSE)
 
 title_abs_freq   <- createTermFrequencyDf(data, "text.title.abstract", 
                                           uniqueKeyword = FALSE, 
-                                          rfidf = TRUE)
+                                          rfidf = FALSE)
 
 # Frequency Terms for Claims
 claims_unique  <- createTermFrequencyDf(data, "claims", uniqueKeyword = TRUE, 
@@ -214,7 +223,7 @@ terms.of.interest <- c("attenuated", "inactivated", "recombinant", "strain")
 # Fig2.1: Frequencia de termos de interesse (1 por patente) x Ano
 chart_1 <- title_abs_unique %>%
   filter(word %in% terms.of.interest) %>%
-  mutate(year = year(as.Date(year, format = "%Y")),
+  mutate(year = year(as.Date(as.character(year), format = "%Y")),
          year_cut = cut(year, breaks = 2))
 
 
@@ -248,7 +257,7 @@ ggplot(data = chart_2,
   geom_bar(position = position_dodge())
 
 
-#Tabela de frequencia de termos somando todos os anos - reivindicações
+#Tabela de frequencia de termos somando todos os anos - reivindica??es
 table_tm.cl <- 
   data.cl.1 %>%
   group_by(word) %>%
@@ -256,7 +265,7 @@ table_tm.cl <-
   arrange(desc(freq))
 
 
-# Fig2.3: Frequencia de termos (1 por patente) por anos - reivindicações
+# Fig2.3: Frequencia de termos (1 por patente) por anos - reivindica??es
 chart_3 <- data.cl.unique %>%
   filter(word %in% terms.of.interest) %>%
   mutate(year = year(as.Date(year, format = "%Y")),
@@ -274,7 +283,7 @@ ggplot(data = chart_3,
   geom_bar(position = position_dodge())
 
 
-# Fig2.4: Frequencia de termos total por anos - reivindicações
+# Fig2.4: Frequencia de termos total por anos - reivindica??es
 chart_4 <- data.cl.1 %>%
   filter(word %in% terms.of.interest) %>%
   mutate(year = year(as.Date(year, format = "%Y")),
@@ -301,18 +310,7 @@ word_ass <- data.frame(doc_id = seq(1:nrow(data)),
                        text = data$text.title.abstract)
 
 corpus.wa <- VCorpus(DataframeSource(word_ass))
-
-clean.corpus <- function(corpus) {
-  corpus <- tm_map(corpus, content_transformer(tolower))
-  corpus <- tm_map(corpus, removeWords, stopwords("english"))
-  corpus <- tm_map(corpus, removePunctuation)
-  corpus <- tm_map(corpus, stripWhitespace)
-  corpus <- tm_map(corpus, removeNumbers)
-  return(corpus)
-}
-
-corpus.wa <- clean.corpus(corpus.wa)
-
+corpus.wa <- cleanCorpus(corpus.wa)
 tdm.wa <- TermDocumentMatrix(corpus.wa,control = list(weighting = weightTfIdf))
 
 # TODO -  Explorar termos mais frequentes e de maior interesse da area para 
@@ -333,8 +331,6 @@ ggplot(associations.recom, aes( y = terms)) +
             colour = "darkred", hjust = -.25, size = 8) +
   theme(text = element_text(size = 20),
         axis.title.y = element_blank())
-
-
 
 associations.inac <- findAssocs(tdm.wa, 'inactivated', 0.25)
 associations.inac <- as.data.frame(associations.inac)
@@ -436,10 +432,10 @@ data$first.priority.number <- gsub("\n(.*)", "", data$priority_number)
 # 2. Count inventors
 data$inventors.fr <- str_count(data$inventors, pattern = "\n") + 1
 
-# Count independent claims
+# 3. Count independent claims
 data$indep.claim.fr <-  str_count(data$indep_claim, pattern = "\n") 
 
-# Count frequency of patents by country
+# 4. Count frequency of patents by country
 
 first <- str_extract(data$family_publication, "[A-Z]{2}")
 temp <- str_extract_all(data$family_publication, "\n[A-Z]{2}")
@@ -455,7 +451,7 @@ temp <- lapply(temp, function(x) unique(x))
 
 # Criar variavel para contagem de paises unicos por patente
 n <- lapply(temp, function(x) length(x))
-data$n.unique.contries <- unlist(n) 
+data$n.unique.countries <- unlist(n) 
 
 # Criar tabela com numero de patentes por pais
 temp <- lapply(temp, function(x) paste0(x, collapse = "|"))
@@ -473,17 +469,32 @@ rm(a, temp, n)
 
 # 4.2 Analise dos dados ==========================================================
 
-#Patentes com maior número de titulares
+#Patentes com maior n?mero de titulares
+table_assignee %>%
+  group_by(Questel.unique.family.ID..FAN.) %>%
+  count() %>%
+  arrange(desc(n))
 
-#Patentes com maior número de inventores
+#Patentes com maior n?mero de inventores
+data %>%
+  arrange(desc(inventors.fr)) %>%
+  select(first.priority.number, inventors.fr) %>%
+  head(., n = 10)
 
-#Patentes com maior número de reivindicações independentes
+#Patentes com maior n?mero de reivindica??es independentes
+data %>%
+  arrange(desc(indep.claim.fr)) %>%
+  select(first.priority.number, indep.claim.fr) %>%
+  head(., n = 10)
 
-#FamPats com maoir número de membros
+#FamPats com maoir nÃºmero de membros
+data %>%
+  arrange(desc(n.unique.countries)) %>%
+  select(first.priority.number, n.unique.countries) %>%
+  head(., n = 10)
 
 
-
-# Patentes por país de depósito
+# Patentes por pa?s de dep?sito
 table_country <- 
   gather(data, str_subset(names(data), "country\\.[1-99]"),
          key = "country",
