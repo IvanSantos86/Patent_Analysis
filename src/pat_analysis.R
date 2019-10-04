@@ -314,6 +314,7 @@ clean.corpus <- function(corpus) {
 corpus.wa <- clean.corpus(corpus.wa)
 
 tdm.wa <- TermDocumentMatrix(corpus.wa,control = list(weighting = weightTfIdf))
+tdm_wa <- TermDocumentMatrix(corpus.wa,control = list(weighting = weightTfIdf))
 
 # TODO -  Explorar termos mais frequentes e de maior interesse da area para 
 # encontrar eventuais padroes e tecnologias
