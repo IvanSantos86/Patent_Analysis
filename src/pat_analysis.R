@@ -38,7 +38,32 @@ data$country <- str_extract(data$priority_number,"([A-z]{2})")
 
 data$year        <- as.numeric(data$year)  # Convert year as numeric
 data$country.rec <- fct_lump(data$country, # Reduce the number of factors
-                             n = 5)  
+                             n = 5) 
+
+# Teste - Criar vector e gráfico com n mínimos de 9 países.
+#countries_vector <- 
+#  data %>%
+#  group_by(year, country) %>%
+#  count() %>%
+#  arrange(year, desc(n)) %>%
+#  top_n(n, n = 5) %>%
+#  filter(n >= 2)
+
+#countries_vector <- unique(countries_vector$country)
+#data$country.rec2 <- ifelse(data$country %in% countries_vector, 
+#                            data$country,
+#                            "Other")
+#
+#data %>%
+#  group_by(year, country.rec2) %>%
+#  count() %>%
+#  ggplot(aes(year, n, fill = country.rec2)) +
+#  geom_bar(stat = "identity", position = "dodge") + 
+#  theme_apa() + 
+#  theme(legend.position = "bottom") +
+#  ylab("") + xlab("") 
+
+
 
 # Separacao do IPC (International Patent Classification)
 a <- strsplit(data$ipc, "\n")
