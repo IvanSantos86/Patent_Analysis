@@ -30,7 +30,7 @@ data <- read.csv2("~/Patent_Analysis/data/data_all.csv",
 # 1.1 Preparacao dos dados ================================================
 
 # Selecionar qual banco de dados (hospedeiro)
-data <- filter(data, host == "avian")
+data <- filter(data, ï..host == "avian")
 
 # Extracao do ano e pais de prioridade
 data$year    <- str_extract(data$priority_number,"([\\d+]{4})")
@@ -335,24 +335,10 @@ word_ass <- data.frame(doc_id = seq(1:nrow(data)),
                        text = data$text.title.abstract)
 
 corpus.wa <- VCorpus(DataframeSource(word_ass))
-<<<<<<< HEAD
 
-clean.corpus <- function(corpus) {
-  corpus <- tm_map(corpus, content_transformer(tolower))
-  corpus <- tm_map(corpus, removeWords, stopwords("english"))
-  corpus <- tm_map(corpus, removePunctuation)
-  corpus <- tm_map(corpus, stripWhitespace)
-  corpus <- tm_map(corpus, removeNumbers)
-  return(corpus)
-}
-
-corpus.wa <- clean.corpus(corpus.wa)
+corpus.wa <- cleanCorpus(corpus.wa)
 
 tdm_wa <- TermDocumentMatrix(corpus.wa,control = list(weighting = weightTfIdf))
-=======
-corpus.wa <- cleanCorpus(corpus.wa)
-tdm.wa <- TermDocumentMatrix(corpus.wa,control = list(weighting = weightTfIdf))
->>>>>>> bd3574589b1e43ecb9dde56ed6c972cdd7a54c7c
 
 # TODO -  Explorar termos mais frequentes e de maior interesse da area para 
 # encontrar eventuais padroes e tecnologias
