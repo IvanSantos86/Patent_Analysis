@@ -6,7 +6,8 @@ library(tm)
 library(lubridate)
 library(ggthemes)
 library(jtools)
-library(qdap)
+library(stringr)
+#library(qdap)
 
 cleanCorpus <- function(corpus) {
   corpus <- tm_map(corpus, content_transformer(tolower))
@@ -16,6 +17,17 @@ cleanCorpus <- function(corpus) {
   corpus <- tm_map(corpus, removeNumbers)
   return(corpus)
 }
+
+cleanText <- function(vector) {
+  require(tm)
+  vector <- tolower(vector)
+  vector <- tm::removePunctuation(vector)
+  vector <- tm::stripWhitespace(vector)
+  vector <- tm::removeNumbers(vector)
+  return(vector)
+}
+
+
 
 # Load Data
 #Windows
@@ -243,7 +255,66 @@ chart_2.1 <-
   arrange(desc(freq))
 
 # Dicionario
-terms.of.interest <- c("attenuated", "inactivated", "recombinant", "strain")
+inactivated <- c("inactivat*", "split", "kill*", "death")
+attenuated <- c("live", "attenuat*", "weak*")
+fraction.component <- c("subunit", "fragment", 
+                        "fraction", "protein*", "polypeptide",
+                        "peptide", "virus-like", "viruslike", 
+                        "like", "particle*", "vlp", "rna", 
+                        "dna", "nucleic", "nucleotide", "vector", 
+                        "plasmid*", "epitope", "engineering", 
+                        "heterologous", "recombined", "pcr", 
+                        "deletion*", "mutation*", "seq", "seq.", 
+                        "sequence", "deleted", "replicon", "gene*", 
+                        "genus", "plant", "edible")
+
+# Criar variáveis para identificar se o dicionário está presente numa determinada
+# claim
+
+data$is.inactivated <- ifelse(
+  str_detect(data$claims, paste0(inactivated, collapse = "|")),
+  1,
+  0)
+
+data$is.attenuated <- ifelse(
+  str_detect(data$claims, paste0(attenuated, collapse = "|")),
+  1,
+  0)
+
+data$is.fraction.component <- ifelse(
+  str_detect(data$claims, paste0(fraction.component, collapse = "|")),
+  1,
+  0)
+
+# Plotar gráfico de linhas por tipo do dicionário por ano
+chart <- 
+  data %>%
+  group_by(year) %>%
+  summarise(
+    inactivated = sum(is.inactivated),
+    attenuated = sum(is.attenuated),
+    fraction.component = sum(is.fraction.component))
+
+chart <- gather(chart, key = tipo, value = valor, -year)
+
+ggplot(chart, aes(x = year, y = valor, color = tipo)) +
+  geom_line()
+
+ggplot(chart, aes(x = year, y = valor, color = tipo)) +
+  geom_line()
+
+# Usar estes descritores num segundo momento
+#vaccine <- c("vaccin*", "preparation*", "composition*", "immunogen*", "antigen*")
+#strain <- c("strain*", "serotype*", "genotype*", "cepa")
+#synthetic <- c("synthetic")
+#glycoconjugated <- c("glycoconjugated", "glycoprotein", "glycan")
+#chimeric <- c("chimeric")
+#diva <- c("diva", "marker")
+#multivalent <- c("multivalent", "polyvalent", "bivalent", "trivalent", "tetravalent")
+#adjuvant <- c("adjuvant*", "stabilizer*")
+#delivery <- c("adminstrat", "parenteral", "mucosal", "nasal", "intranasal", "injected")
+#process <- c("process", "method*", "step*", "purification")
+#diagnosis <- c("diagnos*", "kit*")
 
 # Fig2.1: Frequencia de termos de interesse (1 por patente) x Ano
 chart_1 <- title_abs_unique %>%
