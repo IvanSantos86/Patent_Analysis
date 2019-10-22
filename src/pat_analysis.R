@@ -286,14 +286,15 @@ data$is.fraction.component <- ifelse(
   1,
   0)
 
+# TODO - Ivan, por favor, colocar esta parte do código num lugar mais apropriado
 # Plotar gráfico de linhas por tipo do dicionário por ano
 chart <- 
   data %>%
   group_by(year) %>%
   summarise(
-    inactivated = sum(is.inactivated),
-    attenuated = sum(is.attenuated),
-    fraction.component = sum(is.fraction.component))
+    inactivated = sum(is.inactivated) / n(),
+    attenuated = sum(is.attenuated) / n(),
+    fraction.component = sum(is.fraction.component) / n())
 
 chart <- gather(chart, key = tipo, value = valor, -year)
 
@@ -301,7 +302,7 @@ ggplot(chart, aes(x = year, y = valor, color = tipo)) +
   geom_line()
 
 ggplot(chart, aes(x = year, y = valor, color = tipo)) +
-  geom_line()
+  geom_col()
 
 # Usar estes descritores num segundo momento
 #vaccine <- c("vaccin*", "preparation*", "composition*", "immunogen*", "antigen*")
