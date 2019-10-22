@@ -42,7 +42,7 @@ data <- read.csv2("~/Patent_Analysis/data/data_all.csv",
 # 1.1 Preparacao dos dados ================================================
 
 # Selecionar qual banco de dados (hospedeiro)
-data <- filter(data, host == "avian")
+data <- filter(data, ï..host == "avian")
 
 # Extracao do ano e pais de prioridade
 data$year    <- str_extract(data$priority_number,"([\\d+]{4})")
@@ -407,8 +407,10 @@ word_ass <- data.frame(doc_id = seq(1:nrow(data)),
                        text = data$text.title.abstract)
 
 corpus.wa <- VCorpus(DataframeSource(word_ass))
+
 corpus.wa <- cleanCorpus(corpus.wa)
-tdm.wa <- TermDocumentMatrix(corpus.wa,control = list(weighting = weightTfIdf))
+
+tdm_wa <- TermDocumentMatrix(corpus.wa,control = list(weighting = weightTfIdf))
 
 # TODO -  Explorar termos mais frequentes e de maior interesse da area para 
 # encontrar eventuais padroes e tecnologias
