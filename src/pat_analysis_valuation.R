@@ -18,8 +18,7 @@ data <- read.csv2("~/Patent_Analysis/data/data_all.csv",
                   stringsAsFactors = FALSE)
 
 #remover documentos duuplicados
-data1 <- distinct(data, questel_id,.keep_all= TRUE)
-
+data1 <- distinct(data, questel_id, .keep_all = TRUE)
 
 # 4 Analise de valor das patentes ----------------------------------------------
 
@@ -65,29 +64,34 @@ data <- separate(data,
 
 rm(a, temp, n)
 
-
-
 # 4.2 Analise dos dados ==========================================================
+# Criar um dataframe as variáveis abaixo. Para isso, usar como identificador primário
+# questel.id. Nosso banco de dados terá a seguinte estrutura:
+# 1. questel.id, n.titulares, n.iventores, n.reivindicacoes, n.membros.
+# Para juntar as colunas, usar left_join() do pacote dplyr. 
+# 2. Aplicar uma matriz de correlação para ver se indicadores estão associados
+# 3. Normalizar e padronizar indicadores numéricos
+# 4. Aplicar K-médias.
 
-#Patentes com maior numero de titulares
+# Patentes com maior numero de titulares
 table_assignee %>%
   group_by(Questel.unique.family.ID..FAN.) %>%
   count() %>%
   arrange(desc(n))
 
-#Patentes com maior numero de inventores
+# Patentes com maior numero de inventores
 data %>%
   arrange(desc(inventors.fr)) %>%
   select(first.priority.number, inventors.fr) %>%
   head(., n = 10)
 
-#Patentes com maior numero de reivindicacoes independentes
+# Patentes com maior numero de reivindicacoes independentes
 data %>%
   arrange(desc(indep.claim.fr)) %>%
   select(first.priority.number, indep.claim.fr) %>%
   head(., n = 10)
 
-#FamPats com maior numero de membros
+# FamPats com maior numero de membros
 data %>%
   arrange(desc(n.unique.countries)) %>%
   select(first.priority.number, n.unique.countries) %>%
@@ -105,3 +109,9 @@ table_country <-
   count(country.code) %>%
   arrange(desc(n)) %>%
   filter(country.code != "WO")
+
+
+# Matriz de correlação ----------------------------------------------------
+
+kmeans <- data %>%
+  select()
