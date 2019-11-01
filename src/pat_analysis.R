@@ -9,180 +9,7 @@ library(jtools)
 library(stringr)
 #library(qdap)
 
-cleanCorpus <- function(corpus) {
-  corpus <- tm_map(corpus, content_transformer(tolower))
-  corpus <- tm_map(corpus, removeWords, stopwords("english"))
-  corpus <- tm_map(corpus, removePunctuation)
-  corpus <- tm_map(corpus, stripWhitespace)
-  corpus <- tm_map(corpus, removeNumbers)
-  return(corpus)
-}
-
-cleanText <- function(vector) {
-  require(tm)
-  vector <- tolower(vector)
-  vector <- tm::removePunctuation(vector)
-  vector <- tm::stripWhitespace(vector)
-  vector <- tm::removeNumbers(vector)
-  return(vector)
-}
-
-
-
-# Load Data
-#Windows
-data <- read.csv2("~/GitHub/Patent_Analysis/data/data_all.csv", 
-                stringsAsFactors = FALSE) 
-#Linux
-data <- read.csv2("~/Patent_Analysis/data/data_all.csv", 
-                  stringsAsFactors = FALSE) 
-
-# 1. Evolucao temporal dos depositos de patentes --------------------------
-
-# 1.1 Preparacao dos dados ================================================
-
-# Selecionar qual banco de dados (hospedeiro)
-data <- filter(data, �..host == "avian")
-
-# Extracao do ano e pais de prioridade
-data$year    <- str_extract(data$priority_number,"([\\d+]{4})")
-data$country <- str_extract(data$priority_number,"([A-z]{2})")
-
-data$year        <- as.numeric(data$year)  # Convert year as numeric
-data$country.rec <- fct_lump(data$country, # Reduce the number of factors
-                             n = 5) 
-
-# Teste - Criar vector e gráfico com n mínimos de 9 países.
-#countries_vector <- 
-#  data %>%
-#  group_by(year, country) %>%
-#  count() %>%
-#  arrange(year, desc(n)) %>%
-#  top_n(n, n = 5) %>%
-#  filter(n >= 2)
-
-#countries_vector <- unique(countries_vector$country)
-#data$country.rec2 <- ifelse(data$country %in% countries_vector, 
-#                            data$country,
-#                            "Other")
-#
-#data %>%
-#  group_by(year, country.rec2) %>%
-#  count() %>%
-#  ggplot(aes(year, n, fill = country.rec2)) +
-#  geom_bar(stat = "identity", position = "dodge") + 
-#  theme_apa() + 
-#  theme(legend.position = "bottom") +
-#  ylab("") + xlab("") 
-
-
-
-# Separacao do IPC (International Patent Classification)
-a <- strsplit(data$ipc, "\n")
-a <- max(sapply(a, length))
-
-data <- separate(data, 
-                 col =  ipc,
-                 sep = "\n", 
-                 into = paste0("ipc.", 
-                               seq(1, a)))
-
-rm(a)
-
-# Combinar colunas titulo e resumos
-data$text.title.abstract <- paste(data$title, 
-                                  data$abstract,sep = " ")
-
-
-# Load data assignee names reviewed
-# Windows 
-table_assignee <- read.csv2("~/GitHub/Patent_Analysis/data/patentes_all_assignee_or.csv ")
-# Linux
-table_assignee <- read.csv2("~/Patent_Analysis/data/patentes_all_assignee_or.csv")
-
-table_assignee$assignee.s   <- fct_lump(table_assignee$Latest.standardized.assignees...inventors.removed, n = 10) 
-table_assignee$year.p    <- str_extract(table_assignee$Priority.dates,"([\\d+]{4})")
-
-# 1.2 Analise dos dados ==========================================================
-## An?lise por hospedeiro
-
-## Fig1.1 - Patentes x ano x Pais de prioridade  ---- Ok
-
-# 1. Tabela dos cinco principais paises por ano.
-table_country <- data.frame(year = data$year, country = data$country)
-table_country$p.year <- as.character(table_country$year)
-table_country$p.year <- as.numeric(table_country$p.year)
-table_country$p.country <- fct_lump(table_country$country, n = 5)  
-
-# Plot Fig. 1.1
-data %>% 
-#  group_by(host) %>%
-  count(year, country.rec) %>%
-  ggplot(aes(year, n, fill = country.rec)) +
-  geom_bar(stat = "identity") + 
-#  facet_wrap( ~ host, nrow = 2) +
-  theme_apa() + 
-  theme(legend.position = "bottom") +
-  ylab("") + xlab("") +
-  scale_fill_brewer(palette = "Dark2", type = "qual")
-
-
-# Fig1.2. Patentes x IPC x ano  ----
-#Table
-table_ipc <- gather(data, str_subset(names(data), "ipc."), 
-                    key = "ipc",
-                    value = "ipc.code") %>%
-  filter(ipc.code != "") %>%
-  select(year, ipc.code)
-
-# Extrair IPC nivel classe
-table_ipc$ipc.s   <- str_extract(table_ipc$ipc.code, "[^/]+")
-#table_ipc$ipc.s   <- fct_lump(table_ipc$ipc.s, n = 6) 
-#table_ipc$ipc.code   <- fct_lump(table_ipc$ipc.code, n = 6) 
-
-# Remover codigos que nao sao de interesse
-table_ipc <- filter(table_ipc, ipc.s != "A61K-039")
-table_ipc <- filter(table_ipc, !grepl("A61K-039*", ipc.code))
-#table_ipc <- filter(table_ipc, grepl("C12N-*", ipc.code)) # Caso queira fazer 
-# análise com C12N
-
-# Plot Fig. 1.2
-table_ipc %>% 
-  count(year, ipc.s) %>% 
-  ggplot(aes(year, n, fill = ipc.s, col = ipc.s)) +
-  #geom_bar(stat='identity') +
-  geom_area() +
-  theme_apa() + 
-  theme(legend.position = "bottom") +
-  ylab("") + xlab("") +
-  scale_fill_brewer(palette = "Dark2", type = "qual") +
-  scale_color_brewer(palette = "Dark2", type = "qual") 
-
-
-# Fig1.3 - Patentes x Depositantes x ano
-
-# Table
-table_count_assignees <- 
-  table_assignee %>%
-  group_by(assignee.s) %>%
-  summarise(freq = n()) %>%
-  arrange(desc(freq))
-
-# Plot 
-table_assignee %>% count(year.p, assignee.s) %>% 
-  ggplot(aes(x = year.p, y = n, fill = assignee.s)) +
-  geom_bar(stat = 'identity')
-
-
-# 2 Mineracao do texto -------------------------------------
-
-# 2.1 Preparacao dos dados ===================================================
-
-## Frequencia de termos por ano baseado no titulo+resumo ou reivindica??es
-
-# Frequencia de termos por ano
-
-# Criar corpus
+#funcoes
 createTermFrequencyDf <- function(data, variable, uniqueKeyword = TRUE,
                                   rfidf = FALSE) {
   
@@ -227,6 +54,228 @@ createTermFrequencyDf <- function(data, variable, uniqueKeyword = TRUE,
   data <- do.call(rbind, list.of.dataframes)
 }
 
+cleanCorpus <- function(corpus) {
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  corpus <- tm_map(corpus, removeWords, stopwords("english"))
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, stripWhitespace)
+  corpus <- tm_map(corpus, removeNumbers)
+  return(corpus)
+}
+
+cleanText <- function(vector) {
+  require(tm)
+  vector <- tolower(vector)
+  vector <- tm::removePunctuation(vector)
+  vector <- tm::stripWhitespace(vector)
+  vector <- tm::removeNumbers(vector)
+  return(vector)
+}
+
+
+# Load Data
+#Windows
+data <- read.csv2("~/GitHub/Patent_Analysis/data/data_all.csv", 
+                stringsAsFactors = FALSE) 
+#Linux
+data <- read.csv2("~/Patent_Analysis/data/data_all.csv", 
+                  stringsAsFactors = FALSE) 
+
+# Load data assignee names reviewed
+# Windows 
+table_assignee <- read.csv2("~/GitHub/Patent_Analysis/data/patentes_all_assignee_or.csv ")
+# Linux
+table_assignee <- read.csv2("~/Patent_Analysis/data/patentes_all_assignee_or.csv")
+
+
+# 1. Evolucao temporal dos depositos de patentes --------------------------
+
+# 1.1 Preparacao dos dados ================================================
+
+# Selecionar qual banco de dados (hospedeiro)
+data <- filter(data, �..host == "avian")
+
+# Extracao do ano e pais de prioridade
+data$year    <- str_extract(data$priority_number,"([\\d+]{4})")
+data$year        <- as.numeric(data$year)  # Convert year as numeric
+
+data$country <- str_extract(data$priority_number,"([A-z]{2})")
+
+data$country.rec <- fct_lump(data$country, # Reduce the number of factors
+                             n = 5) 
+
+# Separacao dos IPCs (International Patent Classification)
+a <- strsplit(data$ipc, "\n")
+a <- max(sapply(a, length))
+
+data <- separate(data, 
+                 col =  ipc,
+                 sep = "\n", 
+                 into = paste0("ipc.", 
+                               seq(1, a)))
+
+rm(a)
+
+
+##Depositantes
+#Preparar dados assignees
+table_assignee$assignee.s   <- fct_lump(table_assignee$Latest.standardized.assignees...inventors.removed, n = 10) 
+table_assignee$year.p    <- str_extract(table_assignee$Priority.dates,"([\\d+]{4})")
+
+
+
+# 1.2 Analise dos dados ==========================================================
+
+## Fig. 1.1 - Patentes x ano x Pais de prioridade  ---- Ok
+
+# Tabela dos cinco principais paises por ano - fct_lump
+table_country <- data.frame(year = data$year, country = data$country)
+table_country$p.year <- as.character(table_country$year)
+table_country$p.year <- as.numeric(table_country$p.year)
+table_country$p.country <- fct_lump(table_country$country, n = 5)
+
+# principais paises de prioridade em cada ano
+countries_vector <- 
+  data %>%
+  group_by(year, country) %>%
+  count() %>%
+  arrange(year, desc(n)) %>%
+  top_n(n, n = 5) %>%
+  filter(n >= 4)
+
+countries_vector <- unique(countries_vector$country)
+data$country.rec2 <- ifelse(data$country %in% countries_vector, 
+                            data$country,
+                            "Other")
+
+data %>% 
+#  group_by(host) %>%
+  count(year, country.rec) %>%
+  ggplot(aes(year, n, fill = country.rec)) +
+  geom_bar(stat = "identity") + 
+#  facet_wrap( ~ host, nrow = 2) +
+  theme_apa() + 
+  theme(legend.position = "bottom") +
+  ylab("") + xlab("") +
+  scale_fill_brewer(palette = "Dark2", type = "qual")
+
+#Fig 1.1.2 - Principais paises por ano sem fct_lump
+data %>%
+  group_by(year, country.rec2) %>%
+  count() %>%
+  ggplot(aes(year, n, fill = country.rec2)) +
+  geom_bar(stat = "identity", position = "dodge") + 
+  theme_apa() + 
+  theme(legend.position = "bottom") +
+  ylab("") + xlab("")
+
+
+# Fig. 1.2.1 Patentes x ano x IPC - 5 principais por ano - nivel classe ------
+
+#Table IPC
+table_ipc <- gather(data, str_subset(names(data), "ipc."), 
+                    key = "ipc",
+                    value = "ipc.code") %>%
+  filter(ipc.code != "") %>%
+  select(year, ipc.code)
+
+# Extrair IPC nivel classe
+table_ipc$ipc.s   <- str_extract(table_ipc$ipc.code, "[^/]+")
+#table_ipc$ipc.s   <- fct_lump(table_ipc$ipc.s, n = 6) 
+#table_ipc$ipc.code   <- fct_lump(table_ipc$ipc.code, n = 6) 
+
+# Remover codigos que nao sao de interesse
+table_ipc <- filter(table_ipc, ipc.s != "A61K-039")
+table_ipc <- filter(table_ipc, !grepl("A61K-039*", ipc.code))
+table_ipc <- filter(table_ipc, grepl("C12N-*", ipc.code)) # Caso queira fazer analise com C12N
+
+# sem ser por fctlump
+ipc_vector <-
+  table_ipc %>%
+  group_by(year, ipc.s) %>%
+  count() %>%
+  arrange(year, desc(n)) %>%
+  top_n(n, n = 5) %>%
+  filter(n >= 40)
+
+ipc_vector <- unique(ipc_vector$ipc.s)
+table_ipc$ipc.rec2 <- ifelse(table_ipc$ipc.s %in% ipc_vector, 
+                             table_ipc$ipc.s,
+                            "Other")
+
+table_ipc %>%
+  group_by(year, ipc.rec2) %>%
+  count() %>%
+  ggplot(aes(year, n, fill = ipc.rec2)) +
+  geom_bar(stat = "identity", position = "dodge") + 
+  theme_apa() + 
+  theme(legend.position = "bottom") +
+  ylab("") + xlab("") 
+
+
+#Fig. 1.2.2 - Patentes x ano x IPC - 5 principais por ano - ipc completo
+# sem ser por fct_lump
+ipc_vector <- 
+  table_ipc %>%
+  group_by(year, ipc.code) %>%
+  count() %>%
+  arrange(year, desc(n)) %>%
+  top_n(n, n = 5) %>%
+  filter(n >= 15)
+
+ipc_vector <- unique(ipc_vector$ipc.code)
+table_ipc$ipc.rec2 <- ifelse(table_ipc$ipc.code %in% ipc_vector, 
+                             table_ipc$ipc.code,
+                             "Other")
+
+table_ipc %>%
+  group_by(year, ipc.rec2) %>%
+  count() %>%
+  ggplot(aes(year, n, fill = ipc.rec2)) +
+  geom_bar(stat = "identity", position = "dodge") + 
+  theme_apa() + 
+  theme(legend.position = "bottom") +
+  ylab("") + xlab("")
+
+# Plot Fig. 1.2
+table_ipc %>% 
+  count(year, ipc.s) %>% 
+  ggplot(aes(year, n, fill = ipc.s, col = ipc.s)) +
+  #geom_bar(stat='identity') +
+  geom_area() +
+  theme_apa() + 
+  theme(legend.position = "bottom") +
+  ylab("") + xlab("") +
+  scale_fill_brewer(palette = "Dark2", type = "qual") +
+  scale_color_brewer(palette = "Dark2", type = "qual") 
+
+
+# Fig. 1.3 - Patentes x ano x Depositantes
+# Table assignee
+table_count_assignees <- 
+  table_assignee %>%
+  group_by(assignee.s) %>%
+  summarise(freq = n()) %>%
+  arrange(desc(freq))
+
+#Plot
+table_assignee %>% count(year.p, assignee.s) %>% 
+  ggplot(aes(x = year.p, y = n, fill = assignee.s)) +
+  geom_bar(stat = 'identity')
+
+
+# 2 Mineracao do texto -------------------------------------
+
+# 2.1 Preparacao dos dados ===================================================
+
+# Combinar colunas titulo e resumo
+data$text.title.abstract <- paste(data$title, 
+                                  data$abstract,sep = " ")
+
+## Frequencia de termos por ano baseado no titulo+resumo ou reivindicacoes
+# Frequencia de termos por ano
+
+
 # Frequency Terms for Title+Abstracts
 title_abs_unique <- createTermFrequencyDf(data, 
                                           "text.title.abstract", 
@@ -244,17 +293,7 @@ claims_unique  <- createTermFrequencyDf(data, "claims", uniqueKeyword = TRUE,
 claims_freq    <- createTermFrequencyDf(data, "claims", uniqueKeyword = FALSE, 
                                         rfidf = FALSE)
 
-
-# 2.2 Analise dos dados ==========================================================
-
-# Tabela de frequencia de termos somando todos os anos - Tit/abs
-chart_2.1 <- 
-  title_abs_unique %>%
-  group_by(word) %>%
-  summarise(freq = sum(frequency)) %>%
-  arrange(desc(freq))
-
-# Dicionario
+# Criar Dicionario
 inactivated <- c("inactivat*", "split", "kill*", "death")
 attenuated <- c("live", "attenuat*", "weak*")
 fraction.component <- c("subunit", "fragment", 
@@ -268,8 +307,22 @@ fraction.component <- c("subunit", "fragment",
                         "sequence", "deleted", "replicon", "gene*", 
                         "genus", "plant", "edible")
 
-# Criar variáveis para identificar se o dicionário está presente numa determinada
-# claim
+
+# Usar estes descritores num segundo momento
+#vaccine <- c("vaccin*", "preparation*", "composition*", "immunogen*", "antigen*")
+#strain <- c("strain*", "serotype*", "genotype*", "cepa")
+#synthetic <- c("synthetic")
+#glycoconjugated <- c("glycoconjugated", "glycoprotein", "glycan")
+#chimeric <- c("chimeric")
+#diva <- c("diva", "marker")
+#multivalent <- c("multivalent", "polyvalent", "bivalent", "trivalent", "tetravalent")
+#adjuvant <- c("adjuvant*", "stabilizer*")
+#delivery <- c("adminstrat", "parenteral", "mucosal", "nasal", "intranasal", "injected")
+#process <- c("process", "method*", "step*", "purification")
+#diagnosis <- c("diagnos*", "kit*")
+
+
+# Criar variaveis para identificar se o dicionario esta presente numa determinada claim
 
 data$is.inactivated <- ifelse(
   str_detect(data$claims, paste0(inactivated, collapse = "|")),
@@ -286,8 +339,35 @@ data$is.fraction.component <- ifelse(
   1,
   0)
 
-# TODO - Ivan, por favor, colocar esta parte do código num lugar mais apropriado
-# Plotar gráfico de linhas por tipo do dicionário por ano
+
+# Criar variaveis para identificar se o dicionario esta presente num determinado no ti/abs
+
+data$is.inactivated <- ifelse(
+  str_detect(data$text.title.abstract, paste0(inactivated, collapse = "|")),
+  1,
+  0)
+
+data$is.attenuated <- ifelse(
+  str_detect(data$text.title.abstract, paste0(attenuated, collapse = "|")),
+  1,
+  0)
+
+data$is.fraction.component <- ifelse(
+  str_detect(data$text.title.abstract, paste0(fraction.component, collapse = "|")),
+  1,
+  0)
+
+
+# 2.2 Analise dos dados ==========================================================
+
+# Tabela de frequencia de termos somando todos os anos - Tit/abs
+chart_2.1 <- 
+  title_abs_unique %>%
+  group_by(word) %>%
+  summarise(freq = sum(frequency)) %>%
+  arrange(desc(freq))
+
+# Plotar grafico de linhas por tipo do dicionario por ano
 chart <- 
   data %>%
   group_by(year) %>%
@@ -304,20 +384,26 @@ ggplot(chart, aes(x = year, y = valor, color = tipo)) +
 ggplot(chart, aes(x = year, y = valor, color = tipo)) +
   geom_col()
 
-# Usar estes descritores num segundo momento
-#vaccine <- c("vaccin*", "preparation*", "composition*", "immunogen*", "antigen*")
-#strain <- c("strain*", "serotype*", "genotype*", "cepa")
-#synthetic <- c("synthetic")
-#glycoconjugated <- c("glycoconjugated", "glycoprotein", "glycan")
-#chimeric <- c("chimeric")
-#diva <- c("diva", "marker")
-#multivalent <- c("multivalent", "polyvalent", "bivalent", "trivalent", "tetravalent")
-#adjuvant <- c("adjuvant*", "stabilizer*")
-#delivery <- c("adminstrat", "parenteral", "mucosal", "nasal", "intranasal", "injected")
-#process <- c("process", "method*", "step*", "purification")
-#diagnosis <- c("diagnos*", "kit*")
 
-# Fig2.1: Frequencia de termos de interesse (1 por patente) x Ano
+# Plotar grafico de linhas por tipo do dicionario por ano
+chart <- 
+  data %>%
+  group_by(year) %>%
+  summarise(
+    inactivated = sum(is.inactivated) / n(),
+    attenuated = sum(is.attenuated) / n(),
+    fraction.component = sum(is.fraction.component) / n())
+
+chart <- gather(chart, key = tipo, value = valor, -year)
+
+ggplot(chart, aes(x = year, y = valor, color = tipo)) +
+  geom_line()
+
+ggplot(chart, aes(x = year, y = valor, color = tipo)) +
+  geom_col()
+
+
+# Fig 2.1: Frequencia de termos de interesse (1 por patente) x Ano
 chart_1 <- title_abs_unique %>%
   filter(word %in% terms.of.interest) %>%
   mutate(year = year(as.Date(as.character(year), format = "%Y")),
@@ -566,34 +652,36 @@ data <- separate(data,
 
 rm(a, temp, n)
 
+
+
 # 4.2 Analise dos dados ==========================================================
 
-#Patentes com maior n?mero de titulares
+#Patentes com maior numero de titulares
 table_assignee %>%
   group_by(Questel.unique.family.ID..FAN.) %>%
   count() %>%
   arrange(desc(n))
 
-#Patentes com maior n?mero de inventores
+#Patentes com maior numero de inventores
 data %>%
   arrange(desc(inventors.fr)) %>%
   select(first.priority.number, inventors.fr) %>%
   head(., n = 10)
 
-#Patentes com maior n?mero de reivindica??es independentes
+#Patentes com maior numero de reivindicacoes independentes
 data %>%
   arrange(desc(indep.claim.fr)) %>%
   select(first.priority.number, indep.claim.fr) %>%
   head(., n = 10)
 
-#FamPats com maoir número de membros
+#FamPats com maior numero de membros
 data %>%
   arrange(desc(n.unique.countries)) %>%
   select(first.priority.number, n.unique.countries) %>%
   head(., n = 10)
 
 
-# Patentes por pa?s de dep?sito
+# Patentes por pais de deposito
 table_country <- 
   gather(data, str_subset(names(data), "country\\.[1-99]"),
          key = "country",
