@@ -12,7 +12,6 @@ library(stringr)
 #funcoes
 createTermFrequencyDf <- function(data, variable, uniqueKeyword = TRUE,
                                   rfidf = FALSE) {
-  
   # Create data frame with term frequency data
   # Arguments:
   #   data: dataframe which must have an year column
@@ -23,7 +22,7 @@ createTermFrequencyDf <- function(data, variable, uniqueKeyword = TRUE,
   vector.of.years <- unique(data$year)
   list.of.dataframes <- list()
   
-  for (i in 1:length(vector.of.years)){
+  for (i in 1:length(vector.of.years)) {
     temp.data <- filter(data, year == vector.of.years[i])
     review_source <- VectorSource(eval(parse(text = paste0("temp.data$", variable))))
     corpus <- VCorpus(review_source)
@@ -93,7 +92,7 @@ table_assignee <- read.csv2("~/Patent_Analysis/data/patentes_all_assignee_or.csv
 # 1.1 Preparacao dos dados ================================================
 
 # Selecionar qual banco de dados (hospedeiro)
-data <- filter(data, ï..host == "avian")
+data <- filter(data, ?..host == "avian")
 
 # Extracao do ano e pais de prioridade
 data$year    <- str_extract(data$priority_number,"([\\d+]{4})")

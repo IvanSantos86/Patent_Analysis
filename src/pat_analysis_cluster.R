@@ -1,6 +1,5 @@
 # Patent analysis 
 # Ivan Santos, Ph.D.
-
 library(tidyverse)
 library(tm)
 library(lubridate)
@@ -9,89 +8,12 @@ library(jtools)
 library(stringr)
 #library(qdap)
 
-#funcoes
-createTermFrequencyDf <- function(data, variable, uniqueKeyword = TRUE,
-                                  rfidf = FALSE) {
-  
-  # Create data frame with term frequency data
-  # Arguments:
-  #   data: dataframe which must have an year column
-  #   variable: variable of interest
-  #   distinct: do you need distinct keywords for each document
-  #             or the summed keywords? Default = TRUE
-  
-  vector.of.years <- unique(data$year)
-  list.of.dataframes <- list()
-  
-  for (i in 1:length(vector.of.years)){
-    temp.data <- filter(data, year == vector.of.years[i])
-    review_source <- VectorSource(eval(parse(text = paste0("temp.data$", variable))))
-    corpus <- VCorpus(review_source)
-    corpus <- cleanCorpus(corpus)
-    
-    if (rfidf == TRUE) {
-      dtm <- TermDocumentMatrix(corpus, control = list(weighting = weightTfIdf))
-    } else {
-      dtm <- TermDocumentMatrix(corpus)  
-    }
-    
-    dtm.matrix <- as.matrix(dtm)
-    
-    if (uniqueKeyword == TRUE) {
-      dtm.matrix <- apply(dtm.matrix, 2, function(x) ifelse(x > 0, 1, 0))
-    }
-    
-    term.freq <- rowSums(dtm.matrix)
-    temp.data <- data.frame(year = vector.of.years[i],
-                            word = names(term.freq),
-                            frequency = term.freq)
-    
-    temp.data <- arrange(temp.data, desc(frequency))
-    
-    list.of.dataframes[[i]] <- temp.data
-    
-  }
-  data <- do.call(rbind, list.of.dataframes)
-}
+# Clustering
+library(cluster)
+library(apcluster)
 
-cleanCorpus <- function(corpus) {
-  corpus <- tm_map(corpus, content_transformer(tolower))
-  corpus <- tm_map(corpus, removeWords, stopwords("english"))
-  corpus <- tm_map(corpus, removePunctuation)
-  corpus <- tm_map(corpus, stripWhitespace)
-  corpus <- tm_map(corpus, removeNumbers)
-  return(corpus)
-}
-
-cleanText <- function(vector) {
-  require(tm)
-  vector <- tolower(vector)
-  vector <- tm::removePunctuation(vector)
-  vector <- tm::stripWhitespace(vector)
-  vector <- tm::removeNumbers(vector)
-  return(vector)
-}
-
-frequentTermCluster <- function(data, n_cluster) {
-  
-  df_filtered <- subset(data, data$cluster == n_cluster)
-  
-  corpus_filtered <- data.frame(doc_id = seq(1:nrow(df_filtered)),
-                                text = df_filtered$text.title.abstract)
-  
-  corpus_filtered <- VCorpus(DataframeSource(corpus_filtered))
-  corpus_filtered <- cleanCorpus(corpus_filtered)
-  tda_filtered <- TermDocumentMatrix(corpus_filtered, 
-                                     control = list(weighting = weightTfIdf))
-  
-  tda_filtered <- as.matrix(tda_filtered)
-  words_list <- rowSums(tda_filtered)
-  terms <- sort(words_list, decreasing = TRUE)
-  
-  return(terms[1:10])
-  
-}
-
+# Funcoes
+source("src/utils.R")
 
 # Load Data
 #Windows
@@ -103,14 +25,13 @@ data <- read.csv2("~/Patent_Analysis/data/data_all.csv",
 
 #remover documentos duplicados
 #se nao for selecionar hospedeiro
-data <- distinct(data, questel_id,.keep_all= TRUE)
+data <- distinct(data, questel_id,.keep_all = TRUE)
 
 # Selecionar banco de dados (ex: hospedeiro)
-data <- filter(data, ï..host == "avian")
+data <- filter(data, host == "avian")
 
 
 # 3. Associacao de palavras ----------------------------------------------------
-
 
 ##3.1: Associacoes -------------------
 #com os termos "attenuated", "inactivated", "recombinant", "strain"
@@ -170,8 +91,6 @@ word_associate(word_ass$text,match.string = c('recombinant'),
 
 # 3.3 Affinity Propagation Clustering -----------------------------------------
 
-library(apcluster)
-library(cluster)
 
 # Combinar colunas titulo e resumo
 data$text.title.abstract <- paste(data$title, 
@@ -203,9 +122,7 @@ negMat      <- negDistMat(datacluster, r = 2)
 apmodel     <- apcluster(negMat)
 
 show(apmodel)
-
 plot(apmodel, datacluster)
-
 heatmap(apmodel, negMat)
 
 # Passar clusteres para banco de dados original
@@ -214,11 +131,12 @@ data$cluster <- as.factor(apcluster::labels(apmodel, type = "enum"))
 # Filtrar cluster
 frequentTermCluster(data, n_cluster = 3)  
 
-
 # plotar experimentalmente os clusteres ----
 # Criar variaveis para plotar abaixo
-mds$country.r <- data$country.rec
+mds$country.r <- data$country.rec2
 mds$year <- data$year
+mds$year.r <- data$year.inter
+mds$id <- data$questel_id
 mds$cluster <- as.factor(apcluster::labels(apmodel, type = "enum"))
 
 # Plot clusters
@@ -226,4 +144,9 @@ library(ggpubr)
 ggscatter(mds, x = "Dim.1", y = "Dim.2",
           color = "cluster",
           repel = TRUE) +
-  facet_wrap(~ year) 
+  facet_wrap(~ year.r) 
+
+ggscatter(mds, x = "Dim.1", y = "Dim.2",
+          color = "cluster",
+          repel = TRUE) +
+  facet_wrap(~ country.r) 
