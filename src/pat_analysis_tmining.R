@@ -10,28 +10,37 @@ library(stringr)
 #library(qdap)
 
 #funcoes
-source("src/utils.R")
+source("GitHub/Patent_Analysis/src/utils.R")
 
 # Load Data
 #Windows
-data <- read.csv2("~/GitHub/Patent_Analysis/data/data_all.csv", 
+data <- read.csv2("~/GitHub/Patent_Analysis/data/full_data.csv", 
                   stringsAsFactors = FALSE) 
 #Linux
-data <- read.csv2("~/Patent_Analysis/data/data_all.csv", 
+data <- read.csv2("~/Patent_Analysis/data/full_data.csv", 
                   stringsAsFactors = FALSE)
 
+# Remover documentos duplicados
+# Se nao for selecionar hospedeiro
+data <- distinct(data, questel_id, .keep_all = TRUE)
 
 # Selecionar banco de dados (ex: hospedeiro)
-data <- filter(data, ?..host == "avian")
+data <- filter(data, host == "avian")
 
-# Extracao do ano e pais de prioridade
-data$year    <- str_extract(data$priority_number,"([\\d+]{4})")
-data$year        <- as.numeric(data$year)  # Convert year as numeric
+# Extracao do ano de prioridade
+data$year <- str_extract(data$priority_number,"([\\d+]{4})")
+data$year <- as.numeric(data$year)  # Convert year as numeric
 
+#criar intervalos de anos
+data$year.inter <- ifelse(data$year <= 2001, "1998-2001", 
+                          ifelse(data$year <= 2005, "2002-2005",
+                                 ifelse(data$year <= 2009, "2006-2009",
+                                        ifelse(data$year <= 2013, "2010-2013",
+                                               ifelse(data$year <= 2017, "2014-2017", 
+                                                      "Other")))))
+
+# Extracao do pais de prioridade
 data$country <- str_extract(data$priority_number,"([A-z]{2})")
-
-data$country.rec <- fct_lump(data$country, # Reduce the number of factors
-                             n = 5)
 
 # 2 Mineracao do texto -------------------------------------
 
@@ -43,7 +52,6 @@ data$text.title.abstract <- paste(data$title,
 
 ## Frequencia de termos por ano baseado no titulo+resumo ou reivindicacoes
 # Frequencia de termos por ano
-
 
 # Frequency Terms for Title+Abstracts
 title_abs_unique <- createTermFrequencyDf(data, 
@@ -90,25 +98,8 @@ fraction.component <- c("subunit vaccin*", "recombin* protein*",
 #diagnosis <- c("diagnos*", "kit*")
 
 
-# Criar variaveis para identificar se o dicionario esta presente numa determinada claim
-
-data$is.inactivated <- ifelse(
-  str_detect(data$claims, paste0(inactivated, collapse = "|")),
-  1,
-  0)
-
-data$is.attenuated <- ifelse(
-  str_detect(data$claims, paste0(attenuated, collapse = "|")),
-  1,
-  0)
-
-data$is.fraction.component <- ifelse(
-  str_detect(data$claims, paste0(fraction.component, collapse = "|")),
-  1,
-  0)
-
-
-# Criar variaveis para identificar se o dicionario esta presente num determinado no ti/abs
+# Criar variaveis para identificar se o dicionario esta presente 
+#num determinado no ti/abs
 
 data$is.inactivated <- ifelse(
   str_detect(data$text.title.abstract, paste0(inactivated, collapse = "|")),
@@ -126,11 +117,30 @@ data$is.fraction.component <- ifelse(
   0)
 
 
+# Criar variaveis para identificar se o dicionario esta presente
+#numa determinada claim
+
+data$is.inactivated <- ifelse(
+  str_detect(data$claims, paste0(inactivated, collapse = "|")),
+  1,
+  0)
+
+data$is.attenuated <- ifelse(
+  str_detect(data$claims, paste0(attenuated, collapse = "|")),
+  1,
+  0)
+
+data$is.fraction.component <- ifelse(
+  str_detect(data$claims, paste0(fraction.component, collapse = "|")),
+  1,
+  0)
+
+
 # 2.2 Analise dos dados ==========================================================
 
 # Tabela de frequencia de termos somando todos os anos - Tit/abs
 chart_2.1 <- 
-  title_abs_unique %>%
+  claims_unique %>%
   group_by(word) %>%
   summarise(freq = sum(frequency)) %>%
   arrange(desc(freq))
@@ -149,27 +159,8 @@ chart <- gather(chart, key = tipo, value = valor, -year)
 ggplot(chart, aes(x = year, y = valor, color = tipo)) +
   geom_line()
 
-ggplot(chart, aes(x = year, y = valor, color = tipo)) +
-  geom_col()
 
-
-# Plotar grafico de linhas por tipo do dicionario por ano
-chart <- 
-  data %>%
-  group_by(year) %>%
-  summarise(
-    inactivated = sum(is.inactivated) / n(),
-    attenuated = sum(is.attenuated) / n(),
-    fraction.component = sum(is.fraction.component) / n())
-
-chart <- gather(chart, key = tipo, value = valor, -year)
-
-ggplot(chart, aes(x = year, y = valor, color = tipo)) +
-  geom_line()
-
-ggplot(chart, aes(x = year, y = valor, color = tipo)) +
-  geom_col()
-
+---- x ----
 
 # Fig 2.1: Frequencia de termos de interesse (1 por patente) x Ano
 chart_1 <- title_abs_unique %>%
