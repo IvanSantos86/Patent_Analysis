@@ -28,7 +28,7 @@ table_assignee <- read.csv2("~/Patent_Analysis/data/patentes_all_assignee_or.csv
 data <- distinct(data, questel_id, .keep_all = TRUE)
 
 # Selecionar banco de dados (e.g.: hospedeiro)
-data <- filter(data, host == "avian")
+#data <- filter(data, host == "avian")
 
 
 # 4 Analise de valor das patentes ----------------------------------------------
@@ -85,21 +85,23 @@ rm(a, temp, n)
 # 4. Aplicar K-medias.
 
 # Patentes com maior numero de titulares
-table_assignee %>%
+df_assignee <- 
+  table_assignee %>%
   group_by(Questel.unique.family.ID..FAN.) %>%
   count() %>%
   arrange(desc(n))
+colnames(df_assignee) <- c("questel_id", "n.assignees")
 
 # Patentes com maior numero de inventores
-data %>%
+df_inventors <- 
+  data %>%
   arrange(desc(inventors.fr)) %>%
-  select(first.priority.number, inventors.fr) %>%
-  head(., n = 10)
+  select(questel_id, inventors.fr)
 
 # Patentes com maior numero de reivindicacoes independentes
 data %>%
   arrange(desc(indep.claim.fr)) %>%
-  select(first.priority.number, indep.claim.fr) %>%
+  select(questel_id, indep.claim.fr) %>%
   head(., n = 10)
 
 # FamPats com maior numero de membros
@@ -123,6 +125,38 @@ table_country <-
 
 
 # Matriz de correlacao ----------------------------------------------------
+# Preparar banco de dados
+# Criar banco de dados
+kmeans_df <- data[, c("questel_id", "inventors.fr", "indep.claim.fr", "n.unique.countries")]
+kmeans_df <- left_join(kmeans_df, df_assignee, by = "questel_id")
 
-kmeans <- data %>%
-  select()
+# Plotar banco de dados para análise exploratória
+#kcharts <- gather(kmeans_df, key = var, value = value, -questel_id)
+#ggplot(kcharts, aes(x = value)) + geom_histogram() + 
+#  facet_wrap(~ var)
+
+# Escalar e centrar variáveis de interesse
+kmeans_df_scaled <- kmeans_df
+kmeans_df_scaled[, 2:5] <- sapply(kmeans_df_scaled[, 2:5], scale)
+
+mds <- 
+  kmeans_df_scaled %>%
+  as.matrix() %>%
+  dist() %>% #dissimilarity matrix 
+  cmdscale() %>% # multidimensional scale - reduction for 2 dimensions
+  as_tibble(.name_repair = "unique")
+colnames(mds) <- c("Dim.1", "Dim.2")
+
+datacluster <- as.matrix(mds)
+negMat      <- negDistMat(datacluster, r = 2)
+apmodel     <- apcluster(negMat)
+
+# Passar clusteres para banco de dados original
+kmeans_df_scaled$cluster <- as.factor(apcluster::labels(apmodel, type = "enum"))
+
+library(ggpubr)
+ggscatter(mds, x = "Dim.1", y = "Dim.2",
+          color = "cluster",
+          repel = TRUE)
+
+View(kmeans_df_scaled)

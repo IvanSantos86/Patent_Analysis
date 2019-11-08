@@ -30,7 +30,7 @@ table_assignee <- read.csv2("~/Patent_Analysis/data/patentes_all_assignee_or.csv
 data <- distinct(data, questel_id, .keep_all = TRUE)
 
 # Selecionar banco de dados (e.g.: hospedeiro)
-data <- filter(data, host == "avian")
+# data <- filter(data, host == "avian")
 
 # Extracao do ano e pais de prioridade
 data$year    <- str_extract(data$priority_numbers,"([\\d+]{4})")
