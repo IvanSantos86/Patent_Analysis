@@ -11,14 +11,25 @@ library(stringr)
 
 # Load Data
 #Windows
-data <- read.csv2("~/GitHub/Patent_Analysis/data/data_all.csv", 
+data <- read.csv2("~/GitHub/Patent_Analysis/data/full_data.csv", 
                   stringsAsFactors = FALSE) 
 #Linux
-data <- read.csv2("~/Patent_Analysis/data/data_all.csv", 
+data <- read.csv2("~/Patent_Analysis/data/full_data.csv", 
                   stringsAsFactors = FALSE)
 
+# Load data assignee names reviewed
+# Windows 
+table_assignee <- read.csv2("~/GitHub/Patent_Analysis/data/patentes_all_assignee_or.csv ")
+# Linux
+table_assignee <- read.csv2("~/Patent_Analysis/data/patentes_all_assignee_or.csv")
+
+
 #remover documentos duuplicados
-data1 <- distinct(data, questel_id, .keep_all = TRUE)
+data <- distinct(data, questel_id, .keep_all = TRUE)
+
+# Selecionar banco de dados (e.g.: hospedeiro)
+data <- filter(data, host == "avian")
+
 
 # 4 Analise de valor das patentes ----------------------------------------------
 
@@ -33,7 +44,6 @@ data$inventors.fr <- str_count(data$inventors, pattern = "\n") + 1
 data$indep.claim.fr <-  str_count(data$indep_claim, pattern = "\n") 
 
 # 4. Count frequency of patents by country
-
 first <- str_extract(data$family_publication, "[A-Z]{2}")
 temp <- str_extract_all(data$family_publication, "\n[A-Z]{2}")
 temp <- lapply(temp, function(x) gsub("\n", "", x))
@@ -65,13 +75,14 @@ data <- separate(data,
 rm(a, temp, n)
 
 # 4.2 Analise dos dados ==========================================================
-# Criar um dataframe as variáveis abaixo. Para isso, usar como identificador primário
-# questel.id. Nosso banco de dados terá a seguinte estrutura:
+# Criar um dataframe as variaveis abaixo. 
+#Para isso, usar como identificador primario questel.id. 
+#Nosso banco de dados tera a seguinte estrutura:
 # 1. questel.id, n.titulares, n.iventores, n.reivindicacoes, n.membros.
 # Para juntar as colunas, usar left_join() do pacote dplyr. 
-# 2. Aplicar uma matriz de correlação para ver se indicadores estão associados
-# 3. Normalizar e padronizar indicadores numéricos
-# 4. Aplicar K-médias.
+# 2. Aplicar uma matriz de correlacao para ver se indicadores estao associados
+# 3. Normalizar e padronizar indicadores numericos
+# 4. Aplicar K-medias.
 
 # Patentes com maior numero de titulares
 table_assignee %>%
@@ -111,7 +122,7 @@ table_country <-
   filter(country.code != "WO")
 
 
-# Matriz de correlação ----------------------------------------------------
+# Matriz de correlacao ----------------------------------------------------
 
 kmeans <- data %>%
   select()
