@@ -13,14 +13,14 @@ library(cluster)
 library(apcluster)
 
 # Funcoes
-source("src/utils.R")
+source("GitHub/Patent_Analysis/src/utils.R")
 
 # Load Data
 #Windows
-data <- read.csv2("~/GitHub/Patent_Analysis/data/data_all.csv", 
+data <- read.csv2("~/GitHub/Patent_Analysis/data/full_data.csv", 
                   stringsAsFactors = FALSE) 
 #Linux
-data <- read.csv2("~/Patent_Analysis/data/data_all.csv", 
+data <- read.csv2("~/Patent_Analysis/data/full_data.csv", 
                   stringsAsFactors = FALSE)
 
 #remover documentos duplicados
@@ -31,9 +31,139 @@ data <- distinct(data, questel_id,.keep_all = TRUE)
 data <- filter(data, host == "avian")
 
 
-# 3. Associacao de palavras ----------------------------------------------------
+# 3. Agrupamentos das patentes ----------------------------------------------------
 
-##3.1: Associacoes -------------------
+# 3.1 Affinity Propagation Clustering -----------------------------------------
+
+# Extracao do ano e pais de prioridade
+data$year    <- str_extract(data$priority_numbers,"([\\d+]{4})")
+data$year    <- as.numeric(data$year)  # Convert year as numeric
+
+# Combinar colunas titulo e resumo
+data$text.title.abstract <- paste(data$title, 
+                                  data$abstract,sep = " ")
+
+# Frequency Terms
+title.abs_unique <- createTermFrequencyDf(data, 
+                                          "text.title.abstract", 
+                                          uniqueKeyword = TRUE, 
+                                          rfidf = FALSE)
+claims_unique  <- createTermFrequencyDf(data, "claims", uniqueKeyword = TRUE, 
+                                        rfidf = FALSE)
+
+# Tabela de frequencia de termos somando todos os anos - Tit/abs
+chart_frequency<- 
+  title.abs_unique %>%
+  #claims_unique %>%
+  group_by(word) %>%
+  summarise(freq = sum(frequency)) %>%
+  arrange(desc(freq))
+
+##Usar chart_frequency para criar dicionario de exclusao de termos
+common.words <- c("vaccine", "vaccines", "invention", "relate", "thereof", 
+                  "used", "application","present", "provide", "comprises", 
+                  "disclosed", "discloses", "effective","effectively", 
+                  "effects", "also","wherein", "according", "novel", 
+                  "veterinary", "immun*", "can", "disease", "high", "low", 
+                  "good", "protect", "animal", "number", "belonging", 
+                  "claim","comprises", "comprising", "characterized", 
+                  "contains", "containing", "select", "least", "amount", 
+                  "group","said", "consists", "acceptable", "will", 
+                  "pharmaceutically", "show", "obtain", "prevent")
+
+data$text.title.abstract <- tolower(data$text.title.abstract)
+data$text.title.abstract <- removeWords(data$text.title.abstract, common.words)
+
+# 3.3.1. Criar matrix patente vs. termo - Tit/Abs ------
+matrix <- data.frame(doc_id = seq(1:nrow(data)),
+                       text = data$text.title.abstract)
+
+corpus.matrix <- VCorpus(DataframeSource(matrix))
+corpus.matrix <- cleanCorpus(corpus.matrix)
+
+tdm.matrix<- DocumentTermMatrix(corpus.matrix, control = list(weighting = weightTfIdf))
+tdm.matrix <- as.matrix(tdm.matrix)
+
+# Muldimensional scaling for ploting data
+mds <- 
+  tdm.matrix %>%
+  dist() %>% #dissimilarity matrix 
+  cmdscale() %>% # multidimensional scale - reduction for 2 dimensions
+  as_tibble(.name_repair = "unique")
+colnames(mds) <- c("Dim.1", "Dim.2")
+
+# Preparar dados para algoritmo de propagacao por afinidade.
+# datacluster <- dist(tdm_wa) 
+datacluster <- as.matrix(mds)
+negMat      <- negDistMat(datacluster, r = 2)
+apmodel     <- apcluster(negMat)
+
+show(apmodel)
+plot(apmodel, datacluster)
+#heatmap(apmodel, negMat)
+
+# Passar clusteres para banco de dados original
+data$cluster <- as.factor(apcluster::labels(apmodel, type = "enum"))
+
+
+# 3.3.2. Criar matrix patente vs. termo - Claims ----- 
+matrix <- data.frame(doc_id = seq(1:nrow(data)),
+                     text = data$claims)
+
+corpus.matrix <- VCorpus(DataframeSource(matrix))
+corpus.matrix <- cleanCorpus(corpus.matrix)
+
+tdm_matrix <- DocumentTermMatrix(corpus.matrix, control = list(weighting = weightTfIdf))
+tdm_matrix <- as.matrix(tdm_matrix)
+
+# Muldimensional scaling for ploting data
+mds <- 
+  tdm_matrix %>%
+  dist() %>% #dissimilarity matrix 
+  cmdscale() %>% # multidimensional scale - reduction for 2 dimensions
+  as_tibble(.name_repair = "unique")
+colnames(mds) <- c("Dim.1", "Dim.2")
+
+# Preparar dados para algoritmo de propagacao por afinidade.
+# datacluster <- dist(tdm_wa) 
+datacluster <- as.matrix(mds)
+negMat      <- negDistMat(datacluster, r = 2)
+apmodel     <- apcluster(negMat)
+
+show(apmodel)
+plot(apmodel, datacluster)
+#heatmap(apmodel, negMat)
+
+# Passar clusteres para banco de dados original
+data$cluster <- as.factor(apcluster::labels(apmodel, type = "enum"))
+
+# Filtrar cluster
+frequentTermCluster(data, n_cluster = 5)  
+
+# plotar experimentalmente os clusteres ----
+# Criar variaveis para plotar abaixo
+mds$country.r <- data$country.rec
+mds$year <- data$year
+mds$year.r <- data$year.inter
+mds$id <- data$questel_id
+mds$cluster <- as.factor(apcluster::labels(apmodel, type = "enum"))
+mds$host <- data$host
+
+# Plot clusters
+library(ggpubr)
+ggscatter(mds, x = "Dim.1", y = "Dim.2",
+          color = "cluster",
+          repel = TRUE) +
+  facet_wrap(~ year.r) 
+
+ggscatter(mds, x = "Dim.1", y = "Dim.2",
+          color = "cluster",
+          repel = TRUE) +
+  facet_wrap(~ country.r) 
+
+
+
+##3.2: Associacoes entre termos -------------------
 #com os termos "attenuated", "inactivated", "recombinant", "strain"
 word_ass <- data.frame(doc_id = seq(1:nrow(data)),
                        text = data$text.title.abstract)
@@ -80,73 +210,10 @@ ggplot(associations.inac, aes(y = terms)) +
   theme(text = element_text(size = 20),
         axis.title.y = element_blank())
 
-### 3.2 Word Network ------------
+### 3.3 Word Network ------------
 recombinant <- data[grep("recombinant", data$text.title.abstract,ignore.case = TRUE),]
 word_network_plot(recombinant$text.title.abstract[1:10], stopwords = "english")
 
 word_associate(word_ass$text,match.string = c('recombinant'),
                stopwords = Top200Words,network.plot = T,
                cloud.colors = c("gray85","darkred"))
-
-
-# 3.3 Affinity Propagation Clustering -----------------------------------------
-
-
-# Combinar colunas titulo e resumo
-data$text.title.abstract <- paste(data$title, 
-                                  data$abstract,sep = " ")
-
-
-# 1. Criar matrix patente vs. termo
-matrix <- data.frame(doc_id = seq(1:nrow(data)),
-                       text = data$text.title.abstract)
-
-corpus.matrix <- VCorpus(DataframeSource(matrix))
-corpus.matrix <- cleanCorpus(corpus.matrix)
-
-tdm_matrix <- DocumentTermMatrix(corpus.matrix, control = list(weighting = weightTfIdf))
-tdm_matrix <- as.matrix(tdm_matrix)
-
-# Muldimensional scaling for ploting data
-mds <- 
-  tdm_matrix %>%
-  dist() %>% #dissimilarity matrix 
-  cmdscale() %>% # multidimensional scale - reduction for 2 dimensions
-  as_tibble(.name_repair = "unique")
-colnames(mds) <- c("Dim.1", "Dim.2")
-
-# Preparar dados para algoritmo de propagacao por afinidade.
-# datacluster <- dist(tdm_wa) 
-datacluster <- as.matrix(mds)
-negMat      <- negDistMat(datacluster, r = 2)
-apmodel     <- apcluster(negMat)
-
-show(apmodel)
-plot(apmodel, datacluster)
-heatmap(apmodel, negMat)
-
-# Passar clusteres para banco de dados original
-data$cluster <- as.factor(apcluster::labels(apmodel, type = "enum"))
-
-# Filtrar cluster
-frequentTermCluster(data, n_cluster = 3)  
-
-# plotar experimentalmente os clusteres ----
-# Criar variaveis para plotar abaixo
-mds$country.r <- data$country.rec2
-mds$year <- data$year
-mds$year.r <- data$year.inter
-mds$id <- data$questel_id
-mds$cluster <- as.factor(apcluster::labels(apmodel, type = "enum"))
-
-# Plot clusters
-library(ggpubr)
-ggscatter(mds, x = "Dim.1", y = "Dim.2",
-          color = "cluster",
-          repel = TRUE) +
-  facet_wrap(~ year.r) 
-
-ggscatter(mds, x = "Dim.1", y = "Dim.2",
-          color = "cluster",
-          repel = TRUE) +
-  facet_wrap(~ country.r) 
