@@ -10,10 +10,10 @@ library(stringr)
 
 # Load Data
 #Windows
-data <- read.csv2("~/GitHub/Patent_Analysis/data/data_all.csv", 
+data <- read.csv2("~/GitHub/Patent_Analysis/data/full_data.csv", 
                   stringsAsFactors = FALSE) 
 #Linux
-data <- read.csv2("~/Patent_Analysis/data/data_all.csv", 
+data <- read.csv2("~/Patent_Analysis/data/full_data.csv", 
                   stringsAsFactors = FALSE) 
 
 # Load data assignee names reviewed
@@ -30,12 +30,22 @@ table_assignee <- read.csv2("~/Patent_Analysis/data/patentes_all_assignee_or.csv
 data <- distinct(data, questel_id, .keep_all = TRUE)
 
 # Selecionar banco de dados (e.g.: hospedeiro)
-# data <- filter(data, host == "avian")
+data <- filter(data, host == "avian")
 
 # Extracao do ano e pais de prioridade
-data$year    <- str_extract(data$priority_number,"([\\d+]{4})")
+data$year    <- str_extract(data$priority_numbers,"([\\d+]{4})")
 data$year    <- as.numeric(data$year)  # Convert year as numeric
-data$country <- str_extract(data$priority_number,"([A-z]{2})")
+data$country <- str_extract(data$priority_numbers,"([A-z]{2})")
+
+
+#criar intervalos de anos
+data$year.inter <- ifelse(data$year <= 2001, "1998-2001", 
+                          ifelse(data$year <= 2005, "2002-2005",
+                                 ifelse(data$year <= 2009, "2006-2009",
+                                        ifelse(data$year <= 2013, "2010-2013",
+                                               ifelse(data$year <= 2017, "2014-2017", 
+                                                      "Other")))))
+
 
 # Separacao dos IPCs (International Patent Classification)
 a <- strsplit(data$ipc, "\n")
@@ -50,13 +60,14 @@ rm(a)
 
 #Preparar dados assignees
 table_assignee$year.p <- str_extract(table_assignee$Priority.dates,"([\\d+]{4})")
+colnames(table_assignee)[colnames(table_assignee)=="Latest.standardized.assignees...inventors.removed"] <- "assignee.name"
 
 
 # 1.2 Analise dos dados ==========================================================
 
 ## Fig. 1.1 - Patentes x ano x Pais de prioridade  ---- Ok
 
-# Fig. 1.1 - Patentes x ano x Pais de prioridade
+# Fig. 1.1 - table
 countries_vector <- 
   data %>%
   group_by(year, country) %>%
@@ -64,19 +75,19 @@ countries_vector <-
   arrange(year, desc(n)) %>%
   group_by(year) %>%
   top_n(n = 5, n) %>%
-  filter(n >= 5)
+  filter(n >= 4)
 
 countries_vector <- unique(countries_vector$country)
-data$country.rec2 <- ifelse(data$country %in% countries_vector, 
+data$country.rec <- ifelse(data$country %in% countries_vector, 
                             data$country,
                             "Other")
 
-#Fig 1.1 - Principais paises por ano
+#Fig 1.1 - Patentes x ano x Pais de prioridade
 data %>%
-  filter(country.rec2 != "Other") %>%
-  group_by(year, country.rec2) %>%
+  filter(country.rec != "Other") %>%
+  group_by(year, country.rec) %>%
   count() %>%
-  ggplot(aes(year, n, fill = country.rec2)) +
+  ggplot(aes(year, n, fill = country.rec)) +
   geom_bar(stat = "identity") + 
   theme_apa() + 
   theme(legend.position = "bottom") +
@@ -86,14 +97,7 @@ data %>%
 
 # Fig. 1.2.1 Patentes x ano x IPC - 5 principais por ano - nivel classe ------
 
-#Table IPC
-data$year.inter <- ifelse(data$year <= 2001, "1998-2001", 
-                          ifelse(data$year <= 2005, "2002-2005",
-                                 ifelse(data$year <= 2009, "2006-2009",
-                                        ifelse(data$year <= 2013, "2010-2013",
-                                               ifelse(data$year <= 2017, "2014-2017", 
-                                                      "Other")))))
-
+#Fig. 1.2.1 - Table
 table_ipc <- gather(data, str_subset(names(data), "ipc."), 
                     key = "ipc",
                     value = "ipc.code") %>%
@@ -107,19 +111,50 @@ table_ipc$ipc.s   <- str_extract(table_ipc$ipc.code, "[^/]+")
 table_ipc <- filter(table_ipc, ipc.s != "A61K-039")
 table_ipc <- filter(table_ipc, !grepl("A61K-039*", ipc.code))
 
-# Plot Fig. 1.2.1
+# Fig. 1.2.1 - Plot
 ipc_vector <-
   table_ipc %>%
   group_by(year.inter, ipc.s) %>%
   count() %>%
   arrange(year.inter, desc(n)) %>%
   group_by(year.inter) %>%
-  top_n(n, n = 5)# %>%
+  top_n(n = 5, n)# %>%
 #  filter(n >= 40)
 
 ipc_vector <- unique(ipc_vector$ipc.s)
-table_ipc$ipc.rec2 <- ifelse(table_ipc$ipc.s %in% ipc_vector, 
+table_ipc$ipc.rec <- ifelse(table_ipc$ipc.s %in% ipc_vector, 
                              table_ipc$ipc.s,
+                             "Other")
+
+table_ipc %>%
+  filter(ipc.rec != "Other") %>%
+  group_by(year.inter, ipc.rec) %>%
+  count() %>%
+  ggplot(aes(year.inter, n, fill = ipc.rec)) +
+  geom_bar(stat = "identity") + 
+  theme_apa() + 
+  theme(legend.position = "bottom") +
+  ylab("") + xlab("") 
+
+
+#Fig. 1.2.2 - Patentes x ano x IPC - 5 principais por ano - ipc completo 
+
+#Fig. 1.2.2 - Table - filtrar codigos tecnicos (C*)
+table_ipc <- filter(table_ipc, grepl("C1*|C0*", ipc.code))
+
+#Plot Fig.1.2.2
+ipc_vector2 <-
+  table_ipc %>%
+  group_by(year.inter, ipc.code) %>%
+  count() %>%
+  arrange(year.inter, desc(n)) %>%
+  group_by(year.inter) %>%
+  top_n(n = 5, n)%>%
+  filter(n >= 20)
+
+ipc_vector2 <- unique(ipc_vector2$ipc.code)
+table_ipc$ipc.rec2 <- ifelse(table_ipc$ipc.code %in% ipc_vector2, 
+                             table_ipc$ipc.code,
                              "Other")
 
 table_ipc %>%
@@ -130,71 +165,32 @@ table_ipc %>%
   geom_bar(stat = "identity") + 
   theme_apa() + 
   theme(legend.position = "bottom") +
-  ylab("") + xlab("") 
-
-
-#Fig. 1.2.2 - Patentes x ano x IPC - 5 principais por ano - ipc completo 
-
-#filtrar códigos tecnicos (C*)
-table_ipc <- filter(table_ipc, grepl("C1*|C0*", ipc.code))
-
-#Plot Fig.1.2.2
-ipc_vector <- 
-  table_ipc %>%
-  group_by(year, ipc.code) %>%
-  count() %>%
-  arrange(year, desc(n)) %>%
-  top_n(n, n = 5) %>%
-  filter(n >= 15)
-
-ipc_vector <- unique(ipc_vector$ipc.code)
-table_ipc$ipc.rec3 <- ifelse(table_ipc$ipc.code %in% ipc_vector, 
-                             table_ipc$ipc.code,
-                             "Other")
-
-table_ipc %>%
-  group_by(year, ipc.rec3) %>%
-  count() %>%
-  ggplot(aes(year, n, fill = ipc.rec3)) +
-  geom_bar(stat = "identity") + 
-  theme_apa() + 
-  theme(legend.position = "bottom") +
   ylab("") + xlab("")
 
 
 # Fig. 1.3 - Patentes x ano x Depositantes
 # Table assignee
-table_count_assignees <- 
-  table_assignee %>%
-  group_by(assignee.s) %>%
-  summarise(freq = n()) %>%
-  arrange(desc(freq))
-
-#Plot
-table_assignee %>% count(year.p, assignee.s) %>% 
-  ggplot(aes(x = year.p, y = n, fill = assignee.s)) +
-  geom_bar(stat = 'identity')
-
-
-# principais assignees em cada ano
 assignee_vector <- 
   table_assignee %>%
-  group_by(year.p, Latest.standardized.assignees...inventors.removed) %>%
-  count() %>%
-  arrange(year.p, desc(n)) %>%
-  top_n(n, n = 5) %>%
-  filter(n >= 3)
+  group_by(year.inter,assignee.name) %>%
+  count()  %>%
+  arrange(year.inter, desc(n)) %>%
+  group_by(year.inter) %>%
+  top_n(n = 5, n) #%>% 
+  #filter(n >= 3)
 
+assignee_vector <- unique(assignee_vector$assignee.name)
+table_assignee$country.rec <- ifelse(table_assignee$assignee.name %in% assignee_vector, 
+                                    table_assignee$assignee.name,
+                                    "Other")
 
-assignee_vector <- unique(assignee_vector$Latest.standardized.assignees...inventors.removed)
-table_assignee$ipc.rec4 <- ifelse(table_assignee$Latest.standardized.assignees...inventors.removed %in% assignee_vector, 
-                             table_assignee$Latest.standardized.assignees...inventors.removed,
-                             "Other")
-
+#Plot
 table_assignee %>%
-  group_by(year.p, ipc.rec4) %>%
+  filter(country.rec != "Other") %>%
+  filter(country.rec != "422") %>%
+  group_by(year.inter, country.rec) %>%
   count() %>%
-  ggplot(aes(year.p, n, fill = ipc.rec4)) +
+  ggplot(aes(year.inter, n, fill = country.rec)) +
   geom_bar(stat = "identity") + 
   theme_apa() + 
   theme(legend.position = "bottom") +
