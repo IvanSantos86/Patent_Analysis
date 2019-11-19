@@ -111,6 +111,8 @@ data$cluster <- as.factor(apcluster::labels(apmodel, type = "enum"))
 # 3.3.2. Criar matrix patente vs. termo - Claims ----- 
 matrix <- data.frame(doc_id = seq(1:nrow(data)),
                      text = data$claims)
+matrix <- filter(matrix, nchar(as.character(matrix$text))>0)
+
 
 corpus.matrix <- VCorpus(DataframeSource(matrix))
 corpus.matrix <- cleanCorpus(corpus.matrix)
