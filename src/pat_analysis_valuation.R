@@ -89,26 +89,30 @@ df_assignee <-
   table_assignee %>%
   group_by(Questel.unique.family.ID..FAN.) %>%
   count() %>%
-  arrange(desc(n))
+  arrange(desc(n))#%>%
+  #head(., n = 25)
 colnames(df_assignee) <- c("questel_id", "n.assignees")
 
 # Patentes com maior numero de inventores
 df_inventors <- 
   data %>%
   arrange(desc(inventors.fr)) %>%
-  select(questel_id, inventors.fr)
+  select(first.priority.number, inventors.fr)%>%
+  head(., n = 18)
 
 # Patentes com maior numero de reivindicacoes independentes
-data %>%
+df_indep.claims <- 
+  data %>%
   arrange(desc(indep.claim.fr)) %>%
-  select(questel_id, indep.claim.fr) %>%
-  head(., n = 10)
+  select(first.priority.number, indep.claim.fr) %>%
+  head(., n = 21)
 
 # FamPats com maior numero de membros
-data %>%
+df_family.size <- 
+  data %>%
   arrange(desc(n.unique.countries)) %>%
   select(first.priority.number, n.unique.countries) %>%
-  head(., n = 10)
+  head(., n = 20)
 
 
 # Patentes por pais de deposito
@@ -147,9 +151,12 @@ mds <-
   as_tibble(.name_repair = "unique")
 colnames(mds) <- c("Dim.1", "Dim.2")
 
+library(apcluster)
 datacluster <- as.matrix(mds)
 negMat      <- negDistMat(datacluster, r = 2)
 apmodel     <- apcluster(negMat)
+
+plot(apmodel, datacluster)
 
 # Passar clusteres para banco de dados original
 kmeans_df_scaled$cluster <- as.factor(apcluster::labels(apmodel, type = "enum"))
@@ -160,3 +167,9 @@ ggscatter(mds, x = "Dim.1", y = "Dim.2",
           repel = TRUE)
 
 View(kmeans_df_scaled)
+
+teste <- kmeans_df_scaled[kmeans_df_scaled$inventors.fr >0,]
+teste <- teste[teste$n.assignees>0,]
+
+teste <- teste[teste$indep.claim.fr>0,]
+teste <- teste[teste$n.assignees>0,]
