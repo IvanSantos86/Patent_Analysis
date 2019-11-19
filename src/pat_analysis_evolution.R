@@ -82,28 +82,19 @@ countries_vector <-
   arrange(year, desc(n)) %>%
   group_by(year) %>%
   top_n(n = 5, n) %>% ##checar top_n
-  filter(n >= 4) #necessário pois aparecem muitos paises diferentes
-
-countries_vector <- unique(countries_vector$country)
-data$country.rec <- ifelse(data$country %in% countries_vector, 
-                            data$country,
-                            "Other") 
+  filter(n >= 4) #necess?rio pois aparecem muitos paises diferentes
 
 #Fig 1.1 - Patentes x ano x Pais de prioridade
-data %>%
-  filter(country.rec != "Other") %>%
-  group_by(year, country.rec) %>%
-  count() %>%
-  ggplot(aes(year, n, fill = country.rec)) +
-  geom_bar(stat = "identity") + 
+ggplot(data = countries_vector, 
+       aes(year, n,  fill = country)) +
+  geom_bar(stat = "identity") +
+  scale_fill_brewer(palette = "Dark2", type = "qual") +
   theme_apa() + 
-  theme(legend.position = "bottom") +
   ylab("") + xlab("") +
-  scale_fill_brewer(palette = "Dark2", type = "qual")
+  theme(legend.position = "top")
 
 
 # Fig. 1.2.1 Patentes x ano x IPC - 5 principais por ano - nivel classe ------
-
 #Fig. 1.2.1 - Table
 table_ipc <- gather(data, str_subset(names(data), "ipc."), 
                     key = "ipc",
