@@ -75,6 +75,6 @@ frequentTermCluster <- function(data, n_cluster) {
   words_list <- rowSums(tda_filtered)
   terms <- sort(words_list, decreasing = TRUE)
   
-  return(terms[1:10])
+  return(terms[1:15])
   
 }
