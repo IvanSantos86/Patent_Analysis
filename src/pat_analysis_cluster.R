@@ -33,8 +33,10 @@ data <- filter(data, host == "avian")
 
 # 3. Agrupamentos das patentes ----------------------------------------------------
 
+
 # 3.1 Affinity Propagation Clustering -----------------------------------------
 
+#Preparacao dos dados
 # Extracao do ano e pais de prioridade
 data$year    <- str_extract(data$priority_numbers,"([\\d+]{4})")
 data$year    <- as.numeric(data$year)  # Convert year as numeric
@@ -60,7 +62,7 @@ chart_frequency<-
   arrange(desc(freq))
 
 ##Usar chart_frequency para criar dicionario de exclusao de termos
-common.words <- c("vaccine", "vaccines", "invention", "relate", "thereof", 
+generic.words <- c("vaccine", "vaccines", "invention", "relate", "thereof", 
                   "used", "application","present", "provide", "comprises", 
                   "disclosed", "discloses", "effective","effectively", 
                   "effects", "also","wherein", "according", "novel", 
@@ -72,7 +74,7 @@ common.words <- c("vaccine", "vaccines", "invention", "relate", "thereof",
                   "pharmaceutically", "show", "obtain", "prevent")
 
 data$text.title.abstract <- tolower(data$text.title.abstract)
-data$text.title.abstract <- removeWords(data$text.title.abstract, common.words)
+data$text.title.abstract <- removeWords(data$text.title.abstract, generic.words)
 
 # 3.3.1. Criar matrix patente vs. termo - Tit/Abs ------
 matrix <- data.frame(doc_id = seq(1:nrow(data)),
@@ -81,12 +83,12 @@ matrix <- data.frame(doc_id = seq(1:nrow(data)),
 corpus.matrix <- VCorpus(DataframeSource(matrix))
 corpus.matrix <- cleanCorpus(corpus.matrix)
 
-tdm.matrix<- DocumentTermMatrix(corpus.matrix, control = list(weighting = weightTfIdf))
-tdm.matrix <- as.matrix(tdm.matrix)
+ptm<- DocumentTermMatrix(corpus.matrix, control = list(weighting = weightTfIdf))
+ptm <- as.matrix(ptm)
 
 # Muldimensional scaling for ploting data
 mds <- 
-  tdm.matrix %>%
+  ptm %>%
   dist() %>% #dissimilarity matrix 
   cmdscale() %>% # multidimensional scale - reduction for 2 dimensions
   as_tibble(.name_repair = "unique")
@@ -113,7 +115,7 @@ matrix <- data.frame(doc_id = seq(1:nrow(data)),
 corpus.matrix <- VCorpus(DataframeSource(matrix))
 corpus.matrix <- cleanCorpus(corpus.matrix)
 
-tdm_matrix <- DocumentTermMatrix(corpus.matrix, control = list(weighting = weightTfIdf))
+tdm_matrix <- DocumentTermMatrix(corpus.matrix)
 tdm_matrix <- as.matrix(tdm_matrix)
 
 # Muldimensional scaling for ploting data
@@ -128,7 +130,7 @@ colnames(mds) <- c("Dim.1", "Dim.2")
 # datacluster <- dist(tdm_wa) 
 datacluster <- as.matrix(mds)
 negMat      <- negDistMat(datacluster, r = 2)
-apmodel     <- apcluster(negMat)
+apmodel     <- apcluster(negMat, details=TRUE)
 
 show(apmodel)
 plot(apmodel, datacluster)
@@ -138,7 +140,7 @@ plot(apmodel, datacluster)
 data$cluster <- as.factor(apcluster::labels(apmodel, type = "enum"))
 
 # Filtrar cluster
-frequentTermCluster(data, n_cluster = 5)  
+frequentTermCluster(data, n_cluster = 1)  
 
 # plotar experimentalmente os clusteres ----
 # Criar variaveis para plotar abaixo
