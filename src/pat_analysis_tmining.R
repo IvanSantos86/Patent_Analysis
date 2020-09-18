@@ -160,8 +160,6 @@ ggplot(chart, aes(x = year, y = valor, color = tipo)) +
   geom_line()
 
 
----- x ----
-
 # Fig 2.1: Frequencia de termos de interesse (1 por patente) x Ano
 chart_1 <- title_abs_unique %>%
   filter(word %in% terms.of.interest) %>%
