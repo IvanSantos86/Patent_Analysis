@@ -28,8 +28,8 @@ data <- read.csv2("~/Patent_Analysis/data/full_data.csv",
 data <- distinct(data, questel_id,.keep_all = TRUE)
 
 # Selecionar banco de dados (ex: hospedeiro)
-data <- filter(data, host == "avian")
-
+#data <- filter(data, host == "avian")
+#data <- filter(data, country == "US")
 
 # 3. Agrupamentos das patentes ----------------------------------------------------
 
@@ -38,8 +38,17 @@ data <- filter(data, host == "avian")
 
 #Preparacao dos dados
 # Extracao do ano e pais de prioridade
+data$country <- str_extract(data$priority_numbers,"([A-z]{2})")
 data$year    <- str_extract(data$priority_numbers,"([\\d+]{4})")
 data$year    <- as.numeric(data$year)  # Convert year as numeric
+
+#criar intervalos de anos
+data$year.inter <- ifelse(data$year <= 2001, "1998-2001", 
+                          ifelse(data$year <= 2005, "2002-2005",
+                                 ifelse(data$year <= 2009, "2006-2009",
+                                        ifelse(data$year <= 2013, "2010-2013",
+                                               ifelse(data$year <= 2017, "2014-2017", 
+                                                      "Other")))))
 
 # Combinar colunas titulo e resumo
 data$text.title.abstract <- paste(data$title, 
@@ -62,16 +71,16 @@ chart_frequency<-
   arrange(desc(freq))
 
 ##Usar chart_frequency para criar dicionario de exclusao de termos
-generic.words <- c("vaccine", "vaccines", "invention", "relate", "thereof", 
-                  "used", "application","present", "provide", "comprises", 
-                  "disclosed", "discloses", "effective","effectively", 
-                  "effects", "also","wherein", "according", "novel", 
-                  "veterinary", "immun*", "can", "disease", "high", "low", 
-                  "good", "protect", "animal", "number", "belonging", 
-                  "claim","comprises", "comprising", "characterized", 
-                  "contains", "containing", "select", "least", "amount", 
-                  "group","said", "consists", "acceptable", "will", 
-                  "pharmaceutically", "show", "obtain", "prevent")
+# generic.words <- c("vaccine", "vaccines", "invention", "relate", "thereof", 
+#                   "used", "application","present", "provide", "comprises", 
+#                   "disclosed", "discloses", "effective","effectively", 
+#                   "effects", "also","wherein", "according", "novel", 
+#                   "veterinary", "immun*", "can", "disease", "high", "low", 
+#                   "good", "protect", "animal", "number", "belonging", 
+#                   "claim","comprises", "comprising", "characterized", 
+#                   "contains", "containing", "select", "least", "amount", 
+#                   "group","said", "consists", "acceptable", "will", 
+#                   "pharmaceutically", "show", "obtain", "prevent")
 
 data$text.title.abstract <- tolower(data$text.title.abstract)
 data$text.title.abstract <- removeWords(data$text.title.abstract, generic.words)
@@ -106,6 +115,9 @@ plot(apmodel, datacluster)
 
 # Passar clusteres para banco de dados original
 data$cluster <- as.factor(apcluster::labels(apmodel, type = "enum"))
+
+# Filtrar cluster
+frequentTermCluster(data, n_cluster = 46)
 
 
 # 3.3.2. Criar matrix patente vs. termo - Claims ----- 
@@ -145,6 +157,22 @@ data$cluster <- as.factor(apcluster::labels(apmodel, type = "enum"))
 frequentTermCluster(data, n_cluster = 1)  
 
 # plotar experimentalmente os clusteres ----
+
+# principais paises de prioridade em cada ano
+countries_vector <- 
+  data %>%
+  group_by(year.inter, country) %>%
+  count() %>%
+  arrange(year.inter, desc(n)) %>%
+  top_n(n, n = 5) %>%
+  filter(n >= 10)
+
+countries_vector <- unique(countries_vector$country)
+data$country.rec <- ifelse(data$country %in% countries_vector, 
+                            data$country,
+                            "Other")
+
+
 # Criar variaveis para plotar abaixo
 mds$country.r <- data$country.rec
 mds$year <- data$year
@@ -221,3 +249,41 @@ word_network_plot(recombinant$text.title.abstract[1:10], stopwords = "english")
 word_associate(word_ass$text,match.string = c('recombinant'),
                stopwords = Top200Words,network.plot = T,
                cloud.colors = c("gray85","darkred"))
+
+
+#### TESTE CLUSTER IPC
+
+# 3.3.1. Criar matrix patente vs. IPC
+data1 <- filter(data, ipc != "A61K-039/*")
+
+matrix <- data.frame(doc_id = seq(1:nrow(data)),
+                     text = data1$ipc)
+
+corpus.matrix <- VCorpus(DataframeSource(matrix))
+
+ptm<- DocumentTermMatrix(corpus.matrix)
+ptm <- as.matrix(ptm)
+
+# Muldimensional scaling for ploting data
+mds <- 
+  ptm %>%
+  dist() %>% #dissimilarity matrix 
+  cmdscale() %>% # multidimensional scale - reduction for 2 dimensions
+  as_tibble(.name_repair = "unique")
+colnames(mds) <- c("Dim.1", "Dim.2")
+
+# Preparar dados para algoritmo de propagacao por afinidade.
+# datacluster <- dist(tdm_wa) 
+datacluster <- as.matrix(mds)
+negMat      <- negDistMat(datacluster, r = 2)
+apmodel     <- apcluster(negMat)
+
+show(apmodel)
+plot(apmodel, datacluster)
+#heatmap(apmodel, negMat)
+
+# Passar clusteres para banco de dados original
+data1$cluster <- as.factor(apcluster::labels(apmodel, type = "enum"))
+
+# Filtrar cluster
+frequentTermCluster(data, n_cluster = 1)

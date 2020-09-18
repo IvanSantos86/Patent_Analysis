@@ -19,7 +19,7 @@ data <- read.csv2("~/Patent_Analysis/data/full_data.csv",
 
 # Load data assignee names reviewed
 # Windows 
-table_assignee <- read.csv2("~/GitHub/Patent_Analysis/data/patentes_all_assignee_or.csv ")
+table_assignee <- read.csv2("~/GitHub/Patent_Analysis/data/patentes_all_assignee_or2.csv ")
 # Linux
 table_assignee <- read.csv2("~/Patent_Analysis/data/patentes_all_assignee_or.csv")
 
@@ -75,14 +75,6 @@ data <- separate(data,
 rm(a, temp, n)
 
 # 4.2 Analise dos dados ==========================================================
-# Criar um dataframe as variaveis abaixo. 
-#Para isso, usar como identificador primario questel.id. 
-#Nosso banco de dados tera a seguinte estrutura:
-# 1. questel.id, n.titulares, n.iventores, n.reivindicacoes, n.membros.
-# Para juntar as colunas, usar left_join() do pacote dplyr. 
-# 2. Aplicar uma matriz de correlacao para ver se indicadores estao associados
-# 3. Normalizar e padronizar indicadores numericos
-# 4. Aplicar K-medias.
 
 # Patentes com maior numero de titulares
 df_assignee <- 
@@ -143,6 +135,9 @@ kmeans_df <- left_join(kmeans_df, df_assignee, by = "questel_id")
 kmeans_df_scaled <- kmeans_df
 kmeans_df_scaled[, 2:5] <- sapply(kmeans_df_scaled[, 2:5], scale)
 
+kmeans_df_scaled$soma <- rowSums( kmeans_df_scaled[,2:5] )
+
+#
 mds <- 
   kmeans_df_scaled %>%
   as.matrix() %>%
@@ -165,11 +160,3 @@ library(ggpubr)
 ggscatter(mds, x = "Dim.1", y = "Dim.2",
           color = "cluster",
           repel = TRUE)
-
-View(kmeans_df_scaled)
-
-teste <- kmeans_df_scaled[kmeans_df_scaled$inventors.fr >0,]
-teste <- teste[teste$n.assignees>0,]
-
-teste <- teste[teste$indep.claim.fr>0,]
-teste <- teste[teste$n.assignees>0,]
